@@ -1,405 +1,496 @@
-// File: app/customer/profile/page.js
-// Purpose: Customer profile management (Light Theme)
-// Note: Logic aligned with authcontroller.js and authroute.js
-
 "use client";
 import React, { useEffect, useState } from "react";
-import Footer from "@/app/home/components/Footer";
-import { 
-  Pencil, 
-  X, 
-  Home, 
-  ClipboardList, 
-  LogOut, 
-  User as UserIcon, 
-  Lock, 
-  CheckCircle, 
-  AlertCircle 
-} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-// Keeping your existing API path
-const API_BASE = "http://localhost:5000/api/auth";
+import { Formik, Form, Field, ErrorMessage } from "formik";
+import * as Yup from "yup";
+import {
+  Pencil,
+  X,
+  LogOut,
+  User as UserIcon,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Shield,
+  Mail,
+  Settings,
+  ShoppingBag,
+  Phone,
+  Camera
+} from "lucide-react";
+import Footer from '@/app/components/AppFooter';
+import UserAvatarMenu from '@/app/components/AppUserAvatar';
+import Logo from '@/app/components/Logo';
+import AccountLayout from "../components/AccountLayout";
+
+/**
+ * @file page.js
+ * @description Customer Profile Page.
+ * View and Edit personal details (Name, Address, Phone).
+ * Updates user profile via `/api/auth/profile`.
+ */
+
+const API_BASE = "/api/auth";
+
+const PersonalSchema = Yup.object().shape({
+  firstName: Yup.string().required("First name is required"),
+  lastName: Yup.string().required("Last name is required"),
+});
+
+const ContactSchema = Yup.object().shape({
+  phone_number: Yup.string().required("Phone number is required"),
+  address: Yup.string().required("Address is required"),
+  city: Yup.string().required("City is required"),
+  country: Yup.string().required("Country is required"),
+  postal_code: Yup.string().required("Postal code is required"),
+});
+
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [initialFormValues, setInitialFormValues] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone_number: "",
+    address: "",
+    city: "",
+    country: "",
+    postal_code: ""
+  });
 
-  // State: Profile Form (firstName/lastName matches backend controller expectations)
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "" });
-  
-  // State: Password Form
-  const [pwOpen, setPwOpen] = useState(false);
-  const [pw, setPw] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
-  
-  // State: UI
   const [alert, setAlert] = useState({ type: "", message: "" });
-  const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const token = () => (typeof window === "undefined" ? null : localStorage.getItem("token"));
 
   const showAlert = (type, message, ms = 4000) => {
     setAlert({ type, message });
     if (ms) setTimeout(() => setAlert({ type: "", message: "" }), ms);
   };
 
-  const token = () => (typeof window === "undefined" ? null : localStorage.getItem("token"));
-
-  // --- 1. Fetch Profile ---
   useEffect(() => {
     const t = token();
     if (!t) {
       router.replace("/login");
       return;
     }
-    (async () => {
+
+    const fetchProfile = async () => {
       try {
-        const res = await fetch(`${API_BASE}/profile`, { headers: { Authorization: `Bearer ${t}` } });
-        const data = await res.json();
-        setProfile(data);
-        
-        // Map DB 'first_name' -> State 'firstName'
-        setForm({ 
-          firstName: data.first_name || "", 
-          lastName: data.last_name || "", 
-          email: data.email 
+        const res = await fetch(`${API_BASE}/profile`, {
+          headers: { Authorization: `Bearer ${t}` }
         });
-      } catch {
-        showAlert("error", "Failed to load profile");
+        const data = await res.json();
+
+        if (!res.ok) throw new Error("Failed to fetch profile");
+
+        setProfile(data);
+
+        setProfile(data);
+
+        // Handle both user data and customer data
+        const customer = data.customer || {};
+        setInitialFormValues({
+          firstName: data.first_name || "",
+          lastName: data.last_name || "",
+          email: data.email || "",
+          phone_number: customer.phone_number || "",
+          address: customer.address || "",
+          city: customer.city || "",
+          country: customer.country || "",
+          postal_code: customer.postal_code || ""
+        });
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+        showAlert("error", "Failed to load profile information");
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    fetchProfile();
   }, [router]);
 
-  // Input Handlers
-  const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-  const onPwChange = (e) => setPw((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleInputChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const cancelEdit = () => {
     if (!profile) return;
-    setForm({ firstName: profile.first_name, lastName: profile.last_name, email: profile.email });
+    const customer = profile.customer || {};
+    setForm({
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      email: profile.email,
+      phone_number: customer.phone_number || "",
+      address: customer.address || "",
+      city: customer.city || "",
+      country: customer.country || "",
+      postal_code: customer.postal_code || ""
+    });
     setEditing(false);
   };
 
-  // --- 2. Update Profile Logic ---
-  const handleUpdateProfile = async () => {
-    if (!form.firstName || !form.lastName) return showAlert("error", "First and Last name are required");
-    setSubmitting(true);
+  const handleUpdateProfile = async (values, { setSubmitting }) => {
     try {
       const res = await fetch(`${API_BASE}/profile`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        // Body keys match authcontroller.js: { firstName, lastName }
-        body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Update failed");
-
-      // Update local state immediately
-      setProfile({ ...profile, first_name: form.firstName, last_name: form.lastName });
-      setEditing(false);
-      showAlert("success", "Profile updated successfully!");
-    } catch (err) {
-      showAlert("error", err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // --- 3. Update Password Logic ---
-  const handleUpdatePassword = async (e) => {
-    e.preventDefault();
-    if (pw.newPassword !== pw.confirmPassword) return showAlert("error", "New passwords do not match");
-    if (pw.newPassword.length < 6) return showAlert("error", "Password must be at least 6 characters");
-
-    setSubmitting(true);
-    try {
-      // URL matches authroute.js: /profile/password
-      const res = await fetch(`${API_BASE}/profile/password`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ 
-          oldPassword: pw.oldPassword, 
-          newPassword: pw.newPassword, 
-          confirmPassword: pw.confirmPassword 
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token()}`
+        },
+        body: JSON.stringify({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          customer: {
+            phone_number: values.phone_number || null,
+            address: values.address || null,
+            city: values.city || null,
+            country: values.country || null,
+            postal_code: values.postal_code || null
+          }
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Password update failed");
 
-      setPw({ oldPassword: "", newPassword: "", confirmPassword: "" });
-      setPwOpen(false);
-      showAlert("success", "Password changed successfully!");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Update failed");
+      setProfile(data.user ? { ...data.user, customer: data.customer } : data);
+
+      const newCustomer = (data.user ? data.customer : data.customer) || {};
+      const newUser = data.user || data;
+      setInitialFormValues({
+        firstName: newUser.first_name || "",
+        lastName: newUser.last_name || "",
+        email: newUser.email || "",
+        phone_number: newCustomer.phone_number || "",
+        address: newCustomer.address || "",
+        city: newCustomer.city || "",
+        country: newCustomer.country || "",
+        postal_code: newCustomer.postal_code || ""
+      });
+
+      setEditing(false);
+      setEditingContact(false);
+      showAlert("success", "Profile updated successfully");
     } catch (err) {
+      console.error("Update error:", err);
       showAlert("error", err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Styles (Light Theme)
-  const inputClass = `
-    mt-1 block w-full rounded-lg border border-gray-300
-    px-4 py-2 bg-white text-gray-900 placeholder-gray-400
-    focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all
-    disabled:bg-gray-100 disabled:text-gray-500
-  `;
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    setUploadingImage(true);
+    try {
+      const res = await fetch(`${API_BASE}/profile/image`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token()}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Upload failed");
+
+      setProfile({ ...profile, profile_image: data.imagePath });
+      showAlert("success", "Profile picture updated");
+    } catch (err) {
+      console.error("Upload error:", err);
+      showAlert("error", err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const initials = profile ? (profile.first_name?.[0] || "U").toUpperCase() : "";
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-pulse text-indigo-600 font-medium">Loading profile...</div>
-      </main>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50 to-orange-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-zinc-400 font-medium">Loading your profile...</span>
+        </div>
+      </div>
     );
   }
 
   if (!profile) return null;
 
-  const initials = (profile.first_name?.[0] || "U").toUpperCase();
-
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      
-      {/* Header (Aligned with Dashboard) */}
-      <header className="bg-white border-b sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => router.push("/customer/dashboard")}>
-            <div className="text-2xl font-extrabold tracking-tight select-none">
-              <span className="text-gray-900">Stitch</span>
-              <span className="text-indigo-600">3D</span>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => router.push("/customer/dashboard")} 
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-2"
-            >
-              <Home className="w-4 h-4" /> Home
-            </button>
-            <button 
-              onClick={() => { localStorage.removeItem("token"); router.replace("/login"); }} 
-              className="px-4 py-2 rounded-lg text-sm font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Sidebar */}
-          <aside className="lg:col-span-3">
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl shadow-sm border p-6 sticky top-24"
-            >
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-20 h-20 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-3xl font-bold mb-3 shadow-inner">
-                  {initials}
+    <AccountLayout>
+      <div className="space-y-6">
+        <Formik
+          initialValues={initialFormValues}
+          validationSchema={editing ? PersonalSchema : ContactSchema}
+          enableReinitialize={true}
+          onSubmit={handleUpdateProfile}
+        >
+          {({ isSubmitting, resetForm, dirty }) => (
+            <Form>
+              {/* Profile Header / Avatar Section */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 mb-6 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full blur-3xl opacity-50 -mr-10 -mt-10"></div>
+                <div className="relative group">
+                  <div className="w-32 h-32 rounded-[2rem] bg-orange-600 text-white flex items-center justify-center text-4xl font-black shadow-xl overflow-hidden relative border-4 border-white ring-1 ring-slate-100">
+                    {profile.profile_image ? (
+                      <img src={profile.profile_image} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                  <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-xl shadow-lg border border-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-all text-slate-400 hover:text-[#F97316]">
+                    <Camera size={18} />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} />
+                  </label>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">{profile.first_name} {profile.last_name}</h2>
-                <p className="text-sm text-gray-500">{profile.email}</p>
-                <div className="mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full uppercase tracking-wide">
-                  {profile.role || "Customer"}
+                <div className="text-center md:text-left relative z-10">
+                  <h2 className="text-3xl font-black text-[#1E293B] tracking-tight">{profile.first_name} {profile.last_name}</h2>
+                  <p className="text-slate-500 font-bold mt-1">{profile.email}</p>
+                  <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
+                    <span className="px-3 py-1 bg-orange-50 text-[#F97316] text-[10px] font-black uppercase tracking-widest rounded-full border border-orange-100">
+                      {profile.role}
+                    </span>
+                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
+                      Verified Account
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <nav className="space-y-1">
-                <button onClick={() => router.push("/customer/orders")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-indigo-600 transition-colors font-medium">
-                  <ClipboardList className="w-4 h-4" /> My Orders
-                </button>
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-indigo-50 text-indigo-700 font-medium">
-                  <UserIcon className="w-4 h-4" /> Profile Settings
-                </div>
-              </nav>
-
-              <div className="border-t my-4"></div>
-              
-              <button onClick={() => navigator.clipboard.writeText(profile.email)} className="w-full text-left text-xs text-gray-400 hover:text-indigo-500 transition-colors px-3">
-                Copy Email Address
-              </button>
-            </motion.div>
-          </aside>
-
-          {/* Forms Section */}
-          <div className="lg:col-span-9 space-y-6">
-            
-            {/* 1. Profile Information Card */}
-            <motion.section 
-              initial={{ opacity: 0, y: 10 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.1 }}
-              className="bg-white border rounded-xl shadow-sm overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b bg-gray-50/50 flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Personal Information</h3>
-                  <p className="text-sm text-gray-500">Update your personal details.</p>
-                </div>
-                <button 
-                  onClick={() => setEditing(!editing)} 
-                  className={`p-2 rounded-lg transition-colors ${editing ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                >
-                  {editing ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-                </button>
-              </div>
-
-              <div className="p-6">
-                <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
-                  <div className="grid sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                      <input name="firstName" value={form.firstName} onChange={onChange} className={inputClass} disabled={!editing} />
+              <section className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-orange-50 text-[#F97316] rounded-xl">
+                      <UserIcon className="w-5 h-5" />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                      <input name="lastName" value={form.lastName} onChange={onChange} className={inputClass} disabled={!editing} />
-                    </div>
+                    <h3 className="font-bold text-[#1E293B] text-lg">Personal Details</h3>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                    <input type="email" value={form.email} className={inputClass} disabled />
-                    <p className="mt-1 text-xs text-gray-400">Email cannot be changed manually.</p>
-                  </div>
-
-                  <AnimatePresence>
-                    {editing && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="pt-2 flex gap-3"
+                  <div className="flex items-center gap-3">
+                    {!editing && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="text-sm font-bold text-[#F97316] hover:bg-orange-50 px-4 py-2 rounded-xl transition-all border border-orange-100"
                       >
-                        <button 
-                          type="button" 
-                          onClick={handleUpdateProfile} 
-                          disabled={submitting} 
-                          className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all disabled:opacity-70"
+                        <Pencil className="w-4 h-4 inline-block mr-2" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-8 md:p-10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Field
+                      label="First Name"
+                      name="firstName"
+                      disabled={!editing}
+                      component={SecurityInput}
+                    />
+                    <Field
+                      label="Last Name"
+                      name="lastName"
+                      disabled={!editing}
+                      component={SecurityInput}
+                    />
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Mail className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <input
+                          type="email"
+                          disabled
+                          value={initialFormValues.email}
+                          className="block w-full pl-12 rounded-2xl border-slate-100 bg-slate-50 text-slate-400 text-sm font-bold py-4 px-4 cursor-not-allowed"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400 flex items-center gap-1.5 ml-1">
+                        <Shield className="w-3.5 h-3.5" />
+                        Email cannot be changed for security
+                      </p>
+                    </div>
+
+                    {editing && (
+                      <div className="md:col-span-2 flex items-center gap-4 pt-4">
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="px-8 py-3.5 bg-[#F97316] text-white text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-[#e66000] transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50"
                         >
-                          {submitting ? "Saving..." : "Save Changes"}
+                          {isSubmitting ? "Saving..." : "Save Changes"}
                         </button>
-                        <button 
-                          type="button" 
-                          onClick={cancelEdit} 
-                          className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition-all"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetForm();
+                            setEditing(false);
+                          }}
+                          className="px-8 py-3.5 bg-slate-100 text-slate-600 text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all"
                         >
                           Cancel
                         </button>
-                      </motion.div>
+                      </div>
                     )}
-                  </AnimatePresence>
-                </form>
-              </div>
-            </motion.section>
-
-            {/* 2. Security Card */}
-            <motion.section 
-              initial={{ opacity: 0, y: 10 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.2 }}
-              className="bg-white border rounded-xl shadow-sm overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b bg-gray-50/50 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-amber-100 text-amber-600 rounded-md">
-                    <Lock className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">Security</h3>
-                    <p className="text-sm text-gray-500">Change your password.</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setPwOpen(!pwOpen)} 
-                  className={`p-2 rounded-lg transition-colors ${pwOpen ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                >
-                  {pwOpen ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-                </button>
-              </div>
 
-              <AnimatePresence>
-                {pwOpen && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-6">
-                      <form className="space-y-4 max-w-lg" onSubmit={handleUpdatePassword}>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                          <input 
-                            type="password" name="oldPassword" 
-                            value={pw.oldPassword} onChange={onPwChange} 
-                            className={inputClass} required
-                          />
+                  <div className="mt-12 pt-12 border-t border-slate-50">
+                    <div className="flex justify-between items-center mb-8">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                          <Phone className="w-5 h-5" />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                          <input 
-                            type="password" name="newPassword" 
-                            value={pw.newPassword} onChange={onPwChange} 
-                            className={inputClass} required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                          <input 
-                            type="password" name="confirmPassword" 
-                            value={pw.confirmPassword} onChange={onPwChange} 
-                            className={inputClass} required
-                          />
-                        </div>
-                        <div className="pt-2">
-                          <button 
-                            type="submit" 
-                            disabled={submitting} 
-                            className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium shadow-sm transition-all disabled:opacity-70"
+                        <h3 className="font-bold text-[#1E293B] text-lg">Contact Information</h3>
+                      </div>
+                      {!editingContact && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingContact(true)}
+                          className="text-sm font-bold text-[#F97316] hover:bg-orange-50 px-4 py-2 rounded-xl transition-all border border-orange-100"
+                        >
+                          <Pencil className="w-4 h-4 inline-block mr-2" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <Field
+                        label="Phone Number"
+                        name="phone_number"
+                        type="tel"
+                        disabled={!editingContact}
+                        component={SecurityInput}
+                      />
+                      <Field
+                        label="City"
+                        name="city"
+                        disabled={!editingContact}
+                        component={SecurityInput}
+                      />
+                      <div className="md:col-span-2">
+                        <Field
+                          label="Address"
+                          name="address"
+                          disabled={!editingContact}
+                          component={SecurityInput}
+                        />
+                      </div>
+                      <Field
+                        label="Country"
+                        name="country"
+                        disabled={!editingContact}
+                        component={SecurityInput}
+                      />
+                      <Field
+                        label="Postal Code"
+                        name="postal_code"
+                        disabled={!editingContact}
+                        component={SecurityInput}
+                      />
+
+                      {editingContact && (
+                        <div className="md:col-span-2 flex items-center gap-4 pt-4">
+                          <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="px-8 py-3.5 bg-[#F97316] text-white text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-[#e66000] transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50"
                           >
-                            {submitting ? "Updating..." : "Update Password"}
+                            {isSubmitting ? "Saving..." : "Save Changes"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              resetForm();
+                              setEditingContact(false);
+                            }}
+                            className="px-8 py-3.5 bg-slate-100 text-slate-600 text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all"
+                          >
+                            Cancel
                           </button>
                         </div>
-                      </form>
+                      )}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.section>
-
-          </div>
-        </div>
-
-        {/* Floating Toast Alert */}
-        <AnimatePresence>
-          {alert.message && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className={`fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-xl border flex items-center gap-3 z-50 ${
-                alert.type === 'error' 
-                  ? 'bg-white border-red-200 text-red-700' 
-                  : 'bg-white border-green-200 text-green-700'
-              }`}
-            >
-              {alert.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-              <div>
-                <p className="text-sm font-bold">{alert.type === 'error' ? 'Error' : 'Success'}</p>
-                <p className="text-sm">{alert.message}</p>
-              </div>
-            </motion.div>
+                  </div>
+                </div>
+              </section>
+            </Form>
           )}
-        </AnimatePresence>
-        <div className="h-16" >
-                <Footer />
-              </div>
+        </Formik>
       </div>
-    </main>
+
+      <AnimatePresence>
+        {alert.message && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-50 p-5 rounded-2xl shadow-2xl border flex items-center gap-3 max-w-sm backdrop-blur-md ${alert.type === 'error'
+              ? 'bg-rose-50 border-rose-100 text-rose-800'
+              : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+              }`}
+          >
+            {alert.type === 'error' ? <AlertCircle className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}
+            <p className="text-sm font-bold">{alert.message}</p>
+            <button onClick={() => setAlert({ type: "", message: "" })} className="ml-auto p-1 hover:bg-black/5 rounded-lg transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AccountLayout>
+  );
+}
+
+function SecurityInput({ label, disabled, field, form: { touched, errors }, ...props }) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
+      <input
+        {...field}
+        {...props}
+        disabled={disabled}
+        className={`w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl text-slate-700 font-bold text-sm focus:ring-4 focus:ring-orange-500/10 focus:border-[#F97316] transition-all outline-none ${disabled ? 'opacity-70 bg-slate-50 cursor-not-allowed border-slate-100' : 'border-slate-100 hover:border-slate-200'} ${touched[field.name] && errors[field.name] ? 'border-rose-200' : ''}`}
+      />
+      {touched[field.name] && errors[field.name] && (
+        <div className="mt-2 text-xs text-rose-500 font-bold ml-1 uppercase">{errors[field.name]}</div>
+      )}
+    </div>
+  );
+}
+
+function FormikInput({ label, disabled, field, form: { touched, errors }, ...props }) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
+      <input
+        disabled={disabled}
+        className={`w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl text-slate-700 font-bold text-sm placeholder-slate-400 transition-all outline-none ${disabled
+          ? "opacity-70 bg-slate-50 border-slate-100 cursor-not-allowed"
+          : "border-slate-100 hover:border-slate-200 focus:ring-4 focus:ring-orange-500/10 focus:border-[#F97316]"
+          } ${touched[field.name] && errors[field.name] ? 'border-rose-200' : ''}`}
+        {...field}
+        {...props}
+      />
+      {touched[field.name] && errors[field.name] && (
+        <div className="mt-2 text-xs text-rose-500 font-bold ml-1 uppercase">{errors[field.name]}</div>
+      )}
+    </div>
   );
 }

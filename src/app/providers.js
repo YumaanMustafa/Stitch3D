@@ -23,7 +23,7 @@ export function Providers({ children }) {
   }
 
   return (
-    <ThemeProvider 
+    <ThemeProvider
       attribute="data-bs-theme" // Critical: Tells next-themes to toggle this specific attribute for Bootstrap
       defaultTheme="system"      // Default to system preference
       enableSystem={true}
