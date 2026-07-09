@@ -11,6 +11,9 @@ import { getUserFromRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/designs/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const vendor = getUserFromRequest(request);

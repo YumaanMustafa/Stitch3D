@@ -15,8 +15,8 @@ export async function getChatUserId(request) {
         if (userId) return userId;
         
         if (decoded.role === 'vendor') {
-            const [rows] = await db.query("SELECT user_id FROM vendors WHERE vendor_id = ?", [decoded.id]);
-            return rows[0]?.user_id;
+            // Vendor tokens store the user's user_id in the 'id' claim, so we can return it directly.
+            return decoded.id;
         }
         if (decoded.role === 'supplier') {
             const [rows] = await db.query("SELECT user_id FROM suppliers WHERE supplier_id = ?", [decoded.id]);

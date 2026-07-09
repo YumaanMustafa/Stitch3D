@@ -46,3 +46,6 @@ next-env.d.ts
 server-debug.log
 lint_output.txt
 
+# user uploads
+/public/uploads/
+

@@ -8,6 +8,9 @@ import { getVendorFromRequest, getVendorIdFromUser } from '@/lib/auth';
  * Fetches all reviews for products belonging to the authenticated vendor.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/reviews/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const payload = getVendorFromRequest(request);
@@ -51,6 +54,9 @@ export async function GET(request) {
 /**
  * Reply to a review
  */
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/vendor/reviews/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const payload = getVendorFromRequest(request);

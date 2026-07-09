@@ -12,6 +12,9 @@ async function getVendorId(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/material-requests/[id]/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendorId = await getVendorId(request);
@@ -34,6 +37,9 @@ export async function PUT(request, { params }) {
     }
 }
 
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/vendor/material-requests/[id]/route.js
+// ==========================================
 export async function DELETE(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

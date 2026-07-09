@@ -12,13 +12,19 @@ async function getVendor(request) {
         const vendorId = await getVendorIdFromUser(payload);
         if (!vendorId) return null;
 
-        const [vendors] = await db.query("SELECT * FROM vendors WHERE vendor_id = ?", [vendorId]);
+        const [vendors] = await db.query(
+            "SELECT v.*, u.email, u.password_hash FROM vendors v JOIN users u ON v.user_id = u.user_id WHERE v.vendor_id = ?",
+            [vendorId]
+        );
         return vendors[0] || null;
     } catch (e) {
         return null;
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/settings/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const vendor = await getVendor(request);
@@ -36,7 +42,7 @@ export async function GET(request) {
         return NextResponse.json({
             name: vendor.name,
             email: vendor.email,
-            phone: "", // Phone not currently stored in DB for vendors
+            phone: vendor.phone_number || "",
             logo: userDetails.profile_picture || "/profile/vendor-logo.png",
             twoFA: !!userDetails.two_fa_code,
             companyName: vendor.company_name
@@ -48,6 +54,9 @@ export async function GET(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/settings/route.js
+// ==========================================
 export async function PUT(request) {
     try {
         const vendor = await getVendor(request);
@@ -58,20 +67,19 @@ export async function PUT(request) {
         const body = await request.json();
         const { name, email, phone, password, newPassword, twoFA } = body;
 
-        // 1. Update basic info in vendors table
+        // 1. Update basic info in vendors table (normalized, email goes to users)
         await db.execute(
-            "UPDATE vendors SET name = ?, email = ? WHERE vendor_id = ?",
-            [name, email, vendor.vendor_id]
+            "UPDATE vendors SET name = ?, phone_number = ? WHERE vendor_id = ?",
+            [name || vendor.name, phone !== undefined ? phone : (vendor.phone_number || null), vendor.vendor_id]
         );
 
-        // 2. Update linked user info
-        // Phone number column doesn't exist in users table yet, so we skip it.
-        // If we want to store phone, we need to ALTER TABLE users ADD phone VARCHAR(20)
-        /*
-        if (vendor.user_id && phone !== undefined) {
-             await db.execute("UPDATE users SET phone = ? WHERE user_id = ?", [phone, vendor.user_id]);
+        // 2. Update linked user info (email is stored here)
+        if (vendor.user_id) {
+            await db.execute(
+                "UPDATE users SET email = ? WHERE user_id = ?",
+                [email || vendor.email, vendor.user_id]
+            );
         }
-        */
 
         // 3. Password Change
         if (newPassword) {
@@ -79,15 +87,14 @@ export async function PUT(request) {
             if (!password) {
                 return NextResponse.json({ error: "Current password required" }, { status: 400 });
             }
-            const match = await bcrypt.compare(password, vendor.password);
+            const match = await bcrypt.compare(password, vendor.password_hash);
             if (!match) {
                 return NextResponse.json({ error: "Incorrect current password" }, { status: 400 });
             }
 
             const hash = await bcrypt.hash(newPassword, 10);
-            await db.execute("UPDATE vendors SET password = ? WHERE vendor_id = ?", [hash, vendor.vendor_id]);
 
-            // Sync with users table if linked
+            // Sync with users table (password_hash is stored here)
             if (vendor.user_id) {
                 await db.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", [hash, vendor.user_id]);
             }

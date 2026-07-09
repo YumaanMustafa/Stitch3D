@@ -32,7 +32,9 @@ export default function DesignViewer({ designId }) {
         { id: 'right', label: 'Right Side' }
     ];
 
-    // 1. Fetch Design Data
+    // ==========================================
+    // 1. API CALL: Fetch custom design metadata from DB (using vendorToken)
+    // ==========================================
     useEffect(() => {
         if (!designId) return;
         const fetchDesign = async () => {
@@ -55,7 +57,9 @@ export default function DesignViewer({ designId }) {
         fetchDesign();
     }, [designId]);
 
-    // 2. Load Fabric.js
+    // ==========================================
+    // 2. DEPENDENCY LOADING: Dynamically inject Fabric.js (version 5.3.0)
+    // ==========================================
     useEffect(() => {
         if (window.fabric) {
             setFabricLoaded(true);
@@ -68,7 +72,9 @@ export default function DesignViewer({ designId }) {
         document.body.appendChild(script);
     }, []);
 
-    // 3. Initialize Canvas EXACTLY at 800x900 (Customer native size)
+    // ==========================================
+    // 3. CANVAS INITIALIZATION: Create the Fabric.Canvas container at 800x900
+    // ==========================================
     useEffect(() => {
         if (fabricLoaded && canvasRef.current && !fCanvas.current && designData) {
             const fabric = window.fabric;
@@ -110,7 +116,9 @@ export default function DesignViewer({ designId }) {
         }
     }, [fabricLoaded, designData]);
 
-    // 4. Update Jacket Background Image based on view/color
+    // ==========================================
+    // 4. IMAGE ROUTING: Update the background jacket asset path based on current view/color
+    // ==========================================
     useEffect(() => {
         if (!designData) return;
         const color = designData.color || 'black';
@@ -132,7 +140,9 @@ export default function DesignViewer({ designId }) {
         checkFormat();
     }, [view, designData]);
 
-    // 5. Load Canvas JSON for specific view
+    // ==========================================
+    // 5. JSON OVERLAYS DESERIALIZATION: Load user addons/accessories onto the Fabric canvas
+    // ==========================================
     useEffect(() => {
         if (!fCanvas.current || !designData || !designData.views) return;
 
@@ -156,7 +166,9 @@ export default function DesignViewer({ designId }) {
 
 
 
-    // 6. Ensure background image is perfectly set (supports backwards compatibility)
+    // ==========================================
+    // 6. RENDER BACKGROUND: Draw the physical jacket image on the canvas backdrop
+    // ==========================================
     useEffect(() => {
         if (!fCanvas.current || !window.fabric || !jacketImage) return;
         const fabric = window.fabric;

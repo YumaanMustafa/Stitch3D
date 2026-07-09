@@ -9,6 +9,9 @@ import { NextResponse } from "next/server";
  * Verifies the OTP and updates the user's password.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/reset-password/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email, code, newPassword } = await req.json();

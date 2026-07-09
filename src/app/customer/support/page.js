@@ -1,10 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Search, MessageCircle, Mail, ChevronDown, ChevronUp,
     Package, RefreshCcw, FileText, User, ShoppingBag, Truck,
-    ArrowRight, ShieldCheck, MapPin, Zap, X
+    ArrowRight, ShieldCheck, MapPin, Zap, X, ClipboardList, AlertCircle
 } from "lucide-react";
 import Modal from "../../components/Modal";
 
@@ -61,6 +61,31 @@ export default function SupportPage() {
     const [isComplaintFormOpen, setIsComplaintFormOpen] = useState(false);
     const [complaintData, setComplaintData] = useState({ type: "order", subject: "", message: "", orderId: "" });
     const [submitting, setSubmitting] = useState(false);
+    const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+    const [complaints, setComplaints] = useState([]);
+    const [loadingComplaints, setLoadingComplaints] = useState(false);
+    const [expandedComplaint, setExpandedComplaint] = useState(null);
+
+    const fetchComplaints = async () => {
+        setLoadingComplaints(true);
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch("/api/customer/complaints", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) setComplaints(await res.json());
+        } catch (err) {
+            console.error("Failed to fetch complaints", err);
+        } finally {
+            setLoadingComplaints(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!isTrackingOpen) return;
+        const interval = setInterval(fetchComplaints, 10000);
+        return () => clearInterval(interval);
+    }, [isTrackingOpen]);
 
     const showFeaturePopup = (feature) => {
         setPopup(`${feature} feature coming soon!`);
@@ -262,11 +287,11 @@ export default function SupportPage() {
                                 Generate Complaint
                             </button>
                             <button
-                                onClick={() => showFeaturePopup("Live Chat")}
+                                onClick={() => { setIsTrackingOpen(true); fetchComplaints(); }}
                                 className="w-full sm:w-auto px-10 py-4 bg-white border-2 border-slate-100 text-slate-700 rounded-2xl font-bold hover:border-orange-200 hover:bg-orange-50 hover:text-[#F97316] transition-all flex items-center justify-center gap-2 group shadow-sm"
                             >
-                                <MessageCircle size={20} className="group-hover:scale-110 transition-transform" />
-                                Start Live Chat
+                                <ClipboardList size={20} className="group-hover:scale-110 transition-transform" />
+                                View My Complaints
                             </button>
                         </div>
                     </div>
@@ -375,6 +400,93 @@ export default function SupportPage() {
                         </button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* --- TRACK COMPLAINTS MODAL --- */}
+            <Modal
+                isOpen={isTrackingOpen}
+                onClose={() => { setIsTrackingOpen(false); setExpandedComplaint(null); }}
+                title="My Complaints"
+                maxWidth="max-w-2xl"
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {loadingComplaints ? (
+                        <div className="text-center py-16">
+                            <div className="w-8 h-8 border-4 border-slate-200 border-t-[#F97316] rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading...</p>
+                        </div>
+                    ) : complaints.length === 0 ? (
+                        <div className="text-center py-16">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                                <ClipboardList size={28} />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900 mb-1">No complaints yet</h3>
+                            <p className="text-sm text-slate-500 font-medium">Any complaints you submit will appear here.</p>
+                        </div>
+                    ) : (
+                        complaints.map((c) => {
+                            const isExpanded = expandedComplaint === c.complaint_id;
+                            const statusColors = {
+                                pending: "bg-amber-50 text-amber-600 border-amber-200",
+                                reviewed: "bg-blue-50 text-blue-600 border-blue-200",
+                                resolved: "bg-emerald-50 text-emerald-600 border-emerald-200"
+                            };
+                            const typeIcons = { order: Truck, vendor: ShoppingBag, technical: AlertCircle, other: FileText };
+                            const TypeIcon = typeIcons[c.type] || FileText;
+                            return (
+                                <div
+                                    key={c.complaint_id}
+                                    className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                        isExpanded ? "border-orange-200 shadow-lg ring-4 ring-orange-50" : "border-slate-100 hover:border-orange-100 shadow-sm"
+                                    }`}
+                                >
+                                    <button
+                                        onClick={() => setExpandedComplaint(isExpanded ? null : c.complaint_id)}
+                                        className="w-full flex items-center justify-between p-5 text-left"
+                                    >
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                                isExpanded ? "bg-[#F97316] text-white" : "bg-slate-50 text-slate-400"
+                                            }`}>
+                                                <TypeIcon size={18} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className={`font-bold text-sm truncate ${isExpanded ? "text-[#F97316]" : "text-slate-700"}`}>{c.subject}</p>
+                                                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                                                    {new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                    {c.order_id ? ` · Order #${c.order_id}` : ""}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${statusColors[c.status] || statusColors.pending}`}>
+                                                {c.status}
+                                            </span>
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                                isExpanded ? "rotate-180 bg-orange-100 text-[#F97316]" : "bg-slate-50 text-slate-400"
+                                            }`}>
+                                                <ChevronDown size={14} />
+                                            </div>
+                                        </div>
+                                    </button>
+                                    <AnimatePresence>
+                                        {isExpanded && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: "auto", opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                            >
+                                                <div className="px-5 pb-5 pt-0 border-t border-slate-50 mt-1 pt-4">
+                                                    <p className="text-sm text-slate-600 font-medium leading-relaxed whitespace-pre-wrap">{c.message}</p>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
             </Modal>
         </div>
     );

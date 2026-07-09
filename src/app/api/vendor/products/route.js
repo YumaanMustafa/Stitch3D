@@ -13,6 +13,9 @@ async function getVendorId(request) {
 }
 
 // GET: Fetch ONLY this vendor's products
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/products/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const vendorId = await getVendorId(request);
@@ -26,6 +29,9 @@ export async function GET(request) {
 }
 
 // POST: Create a new product for THIS vendor
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/vendor/products/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const vendorId = await getVendorId(request);

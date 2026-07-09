@@ -10,6 +10,9 @@ import { sendVerificationEmail } from '@/lib/email';
  * Initializes the email verification flow.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/supplier/register/route.js
+// ==========================================
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -39,7 +42,7 @@ export async function POST(request) {
     // 5. Create Supplier entry
     await db.execute(
       "INSERT INTO suppliers (user_id, business_registration_number, phone, address, created_at) VALUES (?, ?, ?, ?, NOW())",
-      [userId, businessRegistrationNumber, phone, address]
+      [userId, businessRegistrationNumber || null, phone, address]
     );
 
     // 6. Send Email

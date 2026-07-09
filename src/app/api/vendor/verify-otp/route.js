@@ -10,6 +10,9 @@ import jwt from "jsonwebtoken";
  * Activates the vendor account if verification succeeds.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/vendor/verify-otp/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email, otp } = await req.json();

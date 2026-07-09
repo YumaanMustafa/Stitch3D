@@ -10,6 +10,9 @@ import bcrypt from "bcryptjs";
  * Allows authenticated users to change their password by providing the old password.
  */
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/auth/profile/password/route.js
+// ==========================================
 export async function PUT(req) {
     try {
         const userPayload = getUserFromRequest(req);

@@ -15,6 +15,9 @@ export const dynamic = 'force-dynamic';
 /**
  * GET handler to fetch all vendors.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/vendors/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const admin = getUserFromRequest(request);
@@ -43,6 +46,9 @@ export async function GET(request) {
     }
 }
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/admin/vendors/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const admin = getUserFromRequest(request);

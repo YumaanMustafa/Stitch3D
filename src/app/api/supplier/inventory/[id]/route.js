@@ -17,6 +17,9 @@ async function getSupplierFromToken(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/supplier/inventory/[id]/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const { id } = await params;
@@ -47,6 +50,9 @@ export async function PUT(request, { params }) {
     }
 }
 
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/supplier/inventory/[id]/route.js
+// ==========================================
 export async function DELETE(request, { params }) {
     try {
         const { id } = await params;

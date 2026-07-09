@@ -8,6 +8,9 @@ import db from '@/lib/db';
  * Handles submission of customer support tickets/complaints.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/customer/complaints/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -49,6 +52,9 @@ export async function POST(req) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/customer/complaints/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const userPayload = getUserFromRequest(req);

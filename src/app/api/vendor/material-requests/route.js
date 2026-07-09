@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getVendorFromRequest, getVendorIdFromUser } from '@/lib/auth';
 
+// Helper to resolve vendor credentials and retrieve vendor primary key ID from token payload
 async function getVendorFromToken(request) {
     try {
         const payload = getVendorFromRequest(request);
@@ -13,11 +14,16 @@ async function getVendorFromToken(request) {
     }
 }
 
+// =========================================================================
+// GET HANDLER: Fetch all B2B material requests initiated by the active vendor
+// =========================================================================
 export async function GET(request) {
     try {
+        // 1. Authenticate vendor credentials
         const vendor = await getVendorFromToken(request);
         if (!vendor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+        // 2. Query material requests, joining supplier user details and bill pricing statistics
         const [requests] = await db.query(`
             SELECT mr.*, s_user.first_name as supplier_first_name, s_user.last_name as supplier_last_name, 
                    b.item_price, b.tax, b.shipping, b.total
@@ -36,25 +42,30 @@ export async function GET(request) {
     }
 }
 
+// =========================================================================
+// POST HANDLER: Create a new B2B material request and notify target supplier
+// =========================================================================
 export async function POST(request) {
     try {
+        // 1. Authenticate vendor credentials
         const vendor = await getVendorFromToken(request);
         if (!vendor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await request.json();
         const { material_name, type, quantity, size, urgency, supplier_id } = body;
 
-        // Validation based on requirement: "All necessary fields must be filled"
+        // 2. Validate request parameters
         if (!material_name || !type || !quantity || !size || !urgency || !supplier_id) {
             return NextResponse.json({ message: "All necessary fields must be filled" }, { status: 400 });
         }
 
+        // 3. Insert B2B material request record
         const [result] = await db.query(`
             INSERT INTO material_requests (vendor_id, supplier_id, material_name, type, quantity, size, urgency, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
         `, [vendor.vendor_id, supplier_id, material_name, type, quantity, size, urgency]);
 
-        // Notify Supplier
+        // 4. Notify Supplier of the incoming material request
         try {
             const [suppliers] = await db.query("SELECT user_id FROM suppliers WHERE supplier_id = ?", [supplier_id]);
             if (suppliers.length > 0) {

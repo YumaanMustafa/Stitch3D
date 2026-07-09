@@ -45,22 +45,50 @@ export default function VendorLayout({ children }) {
     const checkUnread = async () => {
       try {
         if (!token) return;
-        const resN = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
+
+        const [resN, resCustMsg, resSuppMsg] = await Promise.all([
+          fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/chat/unread?filter=customer", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/chat/unread?filter=supplier", { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        let ordersCount = 0;
+        let requestsCount = 0;
+        let messagesCount = 0;
+        let suppliersCount = 0;
+
         if (resN.ok) {
           const notifs = await resN.json();
           const unread = notifs.filter(n => !n.is_read);
-          setUnreadCounts({
-            messages: unread.filter(n => n.type === 'message' && n.message.toLowerCase().includes('customer')).length,
-            suppliers: unread.filter(n => n.type === 'message' && n.message.toLowerCase().includes('supplier')).length,
-            orders: unread.filter(n => n.type === 'order').length,
-            requests: unread.filter(n => n.type === 'material').length
-          });
+          ordersCount = unread.filter(n => n.type === 'order').length;
+          requestsCount = unread.filter(n => n.type === 'material' || n.type === 'request').length;
         }
+
+        if (resCustMsg.ok) {
+           const data = await resCustMsg.json();
+           messagesCount = data.unread || 0;
+        }
+
+        if (resSuppMsg.ok) {
+           const data = await resSuppMsg.json();
+           suppliersCount = data.unread || 0;
+        }
+
+        setUnreadCounts({
+          messages: messagesCount,
+          suppliers: suppliersCount,
+          orders: ordersCount,
+          requests: requestsCount
+        });
       } catch { }
     };
     checkUnread();
     const interval = setInterval(checkUnread, 10000);
-    return () => clearInterval(interval);
+    window.addEventListener('messagesRead', checkUnread);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('messagesRead', checkUnread);
+    };
   }, [router]);
 
   const handleLogout = () => {

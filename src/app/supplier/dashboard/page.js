@@ -49,13 +49,13 @@ export default function SupplierDashboard() {
   }, []);
 
   const chartData = data.chart.length > 0 ? data.chart : [
-    { name: "MON", revenue: 400 },
-    { name: "TUE", revenue: 300 },
-    { name: "WED", revenue: 600 },
-    { name: "THU", revenue: 800 },
-    { name: "FRI", revenue: 500 },
-    { name: "SAT", revenue: 900 },
-    { name: "SUN", revenue: 1000 },
+    { name: "MON", revenue: 0 },
+    { name: "TUE", revenue: 0 },
+    { name: "WED", revenue: 0 },
+    { name: "THU", revenue: 0 },
+    { name: "FRI", revenue: 0 },
+    { name: "SAT", revenue: 0 },
+    { name: "SUN", revenue: 0 },
   ];
 
   return (

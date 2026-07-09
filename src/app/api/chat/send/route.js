@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getChatUserId } from '../auth';
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/chat/send/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const userId = await getChatUserId(request);

@@ -19,7 +19,10 @@ export function ToastProvider({ children }) {
     }
   }, []);
 
-  const removeToast = useCallback((id) => {
+  // ==========================================
+// REMOVE TOAST: Removes a toast notification from the stack by ID
+// ==========================================
+const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

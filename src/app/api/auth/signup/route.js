@@ -11,6 +11,9 @@ import { NextResponse } from "next/server";
  * Creates related role-specific records and sends verification emails.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/signup/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const body = await req.json();

@@ -8,6 +8,9 @@ import { getCustomerFromRequest } from '../../../../lib/auth';
  * Allows customers to submit reviews for products they have purchased and received.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/customer/reviews/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const payload = getCustomerFromRequest(request);
@@ -39,7 +42,7 @@ export async function POST(request) {
         const safeReviewText = reviewText && reviewText.length > 1000 ? reviewText.substring(0, 1000) : reviewText;
 
         // 2. Explicitly verify this is a Standard Vendor Product (not a custom design)
-        const [productCheck] = await db.query('SELECT id FROM vendor_products WHERE id = ?', [productId]);
+        const [productCheck] = await db.query('SELECT id, vendor_id, name FROM vendor_products WHERE id = ?', [productId]);
         if (productCheck.length === 0) {
             return NextResponse.json({ 
                 error: 'Invalid Product', 
@@ -103,6 +106,26 @@ export async function POST(request) {
             );
 
             await connection.commit();
+
+            try {
+                const vendorId = productCheck[0].vendor_id;
+                const productName = productCheck[0].name;
+                
+                if (vendorId) {
+                    await db.query(
+                        "INSERT INTO notifications (user_id, role, title, message, type) VALUES (?, 'vendor', ?, ?, 'message')",
+                        [
+                            vendorId,
+                            "New Product Review",
+                            `A customer left a ${parsedRating}-star review on your product: ${productName}.`,
+                            "message"
+                        ]
+                    );
+                }
+            } catch (err) {
+                console.error("Non-fatal notification error:", err);
+            }
+
             return NextResponse.json({ success: true, message: 'Review submitted successfully!' });
 
         } catch (txnError) {
@@ -114,6 +137,66 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("Review API Error:", error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error', message: error.message }, { status: 500 });
+    }
+}
+
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/customer/reviews/route.js
+// ==========================================
+export async function DELETE(request) {
+    try {
+        const payload = getCustomerFromRequest(request);
+        if (!payload) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userId = payload.id || payload.userId;
+        const [customerRows] = await db.query('SELECT customer_id FROM customers WHERE user_id = ?', [userId]);
+        
+        if (customerRows.length === 0) {
+            return NextResponse.json({ error: 'Customer profile not found' }, { status: 404 });
+        }
+        
+        const customerId = customerRows[0].customer_id;
+        const { searchParams } = new URL(request.url);
+        const productId = searchParams.get('productId');
+
+        if (!productId) {
+            return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+        }
+
+        const connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            await connection.query(
+                'DELETE FROM product_reviews WHERE product_id = ? AND customer_id = ?',
+                [productId, customerId]
+            );
+
+            // Update Product Cache Columns (Optimization)
+            const [stats] = await connection.query(
+                'SELECT AVG(rating) as avgRating, COUNT(*) as count FROM product_reviews WHERE product_id = ?',
+                [productId]
+            );
+            
+            await connection.query(
+                'UPDATE vendor_products SET average_rating = ?, total_reviews = ? WHERE id = ?',
+                [stats[0].avgRating || 0, stats[0].count || 0, productId]
+            );
+
+            await connection.commit();
+            return NextResponse.json({ success: true, message: 'Review deleted successfully!' });
+
+        } catch (txnError) {
+            await connection.rollback();
+            throw txnError;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error("Review Delete API Error:", error);
+        return NextResponse.json({ error: 'Internal Server Error', message: error.message }, { status: 500 });
     }
 }

@@ -11,6 +11,9 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/customer/orders/my/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const authHeader = request.headers.get('authorization');
@@ -35,12 +38,14 @@ export async function GET(request) {
                 o.total,
                 o.status,
                 o.shipping_method as shipping,
+                v.user_id as vendor_user_id,
                 COUNT(oi.item_id) as items_count
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
             LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            LEFT JOIN vendors v ON o.vendor_id = v.vendor_id
             WHERE c.user_id = ?
-            GROUP BY o.order_id
+            GROUP BY o.order_id, v.user_id
             ORDER BY o.created_at DESC
         `, [userId]);
 

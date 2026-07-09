@@ -8,6 +8,9 @@ import db from '@/lib/db';
  * Fetches notifications for the logged-in vendor.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/notifications/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const vendorPayload = getVendorFromRequest(req);

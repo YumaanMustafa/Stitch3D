@@ -9,6 +9,9 @@ import { getUserFromRequest } from '@/lib/auth';
  * Updates the status of a specific design request (e.g., pending -> approved).
  */
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/designs/[id]/status/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendor = getUserFromRequest(request);

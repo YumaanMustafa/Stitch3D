@@ -24,12 +24,25 @@ export default function VendorDashboard() {
       growth: "+12.5%"
    });
    const [loading, setLoading] = useState(true);
+   const [todayStr, setTodayStr] = useState("June 09, 2026");
 
    useEffect(() => {
+      try {
+         const formatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: "America/Los_Angeles",
+            month: "long",
+            day: "2-digit",
+            year: "numeric"
+         });
+         setTodayStr(formatter.format(new Date()));
+      } catch (e) {
+         console.error("Failed to format date in PST:", e);
+      }
+
       const fetchData = async () => {
          try {
             const token = localStorage.getItem("vendorToken");
-            const res = await fetch("/api/vendor/dashboard-stats", {
+            const res = await fetch("/api/vendor/dashboard/stats", {
                headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
@@ -70,7 +83,7 @@ export default function VendorDashboard() {
                </div>
                <div className="pr-4">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Today</p>
-                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1">June 09, 2026</p>
+                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1">{todayStr}</p>
                </div>
             </div>
          </div>
@@ -79,7 +92,7 @@ export default function VendorDashboard() {
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
                { label: "Total Revenue", value: `Rs ${stats.revenue}`, icon: DollarSign, trend: "+8.2%", color: "emerald" },
-               { label: "Orders", value: stats.activeOrders, icon: ShoppingBag, trend: "+12", color: "orange" },
+               { label: "PendingOrders", value: stats.activeOrders, icon: ShoppingBag, trend: "+12", color: "orange" },
                { label: "Products", value: stats.totalProducts, icon: Package, trend: "0", color: "slate" },
                { label: "Sales Growth", value: stats.growth, icon: TrendingUp, trend: "Up", color: "emerald" },
             ].map((item, idx) => (

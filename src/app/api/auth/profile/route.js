@@ -28,6 +28,9 @@ async function findCustomerByUserId(userId) {
 /**
  * GET handler to retrieve user profile.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/auth/profile/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -48,6 +51,9 @@ export async function GET(req) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/auth/profile/route.js
+// ==========================================
 export async function PUT(req) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -103,6 +109,9 @@ export async function PUT(req) {
     }
 }
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/profile/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -123,6 +132,9 @@ export async function POST(req) {
     }
 }
 
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/auth/profile/route.js
+// ==========================================
 export async function DELETE(req) {
     try {
         const userPayload = getUserFromRequest(req);

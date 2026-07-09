@@ -12,6 +12,9 @@ async function getVendorId(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/material-requests/[id]/renegotiate/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

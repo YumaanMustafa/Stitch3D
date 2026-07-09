@@ -10,6 +10,9 @@ import jwt from 'jsonwebtoken';
  * Ensures vendors cannot login until approved by Admin.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/vendor/login/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const body = await request.json();
@@ -19,63 +22,48 @@ export async function POST(request) {
             return NextResponse.json({ message: "Missing credentials" }, { status: 400 });
         }
 
-        // 1. Find vendor by email
-        const [vendors] = await db.execute("SELECT * FROM vendors WHERE email = ?", [email]);
+        // 1. Find user and vendor by email
+        const [rows] = await db.execute(
+            `SELECT u.user_id, u.email, u.password_hash, u.status, u.role, v.vendor_id, v.name, v.company_name, v.phone_number 
+             FROM users u 
+             LEFT JOIN vendors v ON u.user_id = v.user_id 
+             WHERE u.email = ? AND u.role = 'vendor'`,
+            [email]
+        );
 
-        if (vendors.length === 0) {
+        if (rows.length === 0) {
             return NextResponse.json({ message: "Invalid credentials." }, { status: 401 });
         }
 
-        const vendor = vendors[0];
+        const user = rows[0];
 
         // 2. Check Password
-        const isMatch = await bcrypt.compare(password, vendor.password);
+        const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
             return NextResponse.json({ message: "Invalid credentials." }, { status: 401 });
         }
 
-        // 3. Check User Status (if linked)
-        let status = 'pending'; // Default to pending for security if checks fail
-
-        if (vendor.user_id) {
-            // Use db.query for SELECT consistency
-            const [rows] = await db.query("SELECT status, role FROM users WHERE user_id = ?", [vendor.user_id]);
-            if (rows.length > 0) {
-                status = rows[0].status || 'pending';
-                if (rows[0].role !== 'vendor') {
-                    return NextResponse.json({ message: "Invalid credentials." }, { status: 401 });
-                }
-            }
-        } else {
-            // Legacy fallback: checking if they have an old 'status' column in vendors table or default to active if truly legacy
-            // unique logic: if no user_id, it might be an old vendor. Let's assume 'active' only if we are sure, otherwise 'pending'.
-            // For strictness requested by user, new vendors MUST have user_id. 
-            // If legacy vendors exist without user_id, they might get locked out. 
-            // Assuming migration happened. If not, let's keep 'active' only if explicit.
-            status = 'active';
-        }
-
-        const normalizedStatus = status.toLowerCase();
+        const normalizedStatus = (user.status || 'pending').toLowerCase();
 
         // ENFORCE STATUS CHECKS
         if (normalizedStatus === 'pending') {
             return NextResponse.json({
                 message: "Your application is currently pending approval. Please check back later.",
-                user: { status: 'pending', email: vendor.email }
+                user: { status: 'pending', email: user.email }
             }, { status: 403 });
         }
 
         if (normalizedStatus === 'rejected') {
             return NextResponse.json({
                 message: "Your vendor application has been rejected. Please contact support.",
-                user: { status: 'rejected', email: vendor.email }
+                user: { status: 'rejected', email: user.email }
             }, { status: 403 });
         }
 
         if (normalizedStatus === 'banned') {
             return NextResponse.json({
                 message: "Your account has been suspended.",
-                user: { status: 'banned', email: vendor.email }
+                user: { status: 'banned', email: user.email }
             }, { status: 403 });
         }
 
@@ -85,10 +73,10 @@ export async function POST(request) {
         // id is user_id for system consistency, vendor_id is added for optimization
         const token = jwt.sign(
             { 
-                id: vendor.user_id || vendor.vendor_id, 
-                vendor_id: vendor.vendor_id, 
+                id: user.user_id, 
+                vendor_id: user.vendor_id, 
                 role: 'vendor', 
-                email: vendor.email 
+                email: user.email 
             },
             process.env.JWT_SECRET || 'super_secret_stitch_key_2025',
             { expiresIn: '1d' }
@@ -99,9 +87,9 @@ export async function POST(request) {
             token,
             pending_deletion: isPendingDeletion,
             user: {
-                email: vendor.email,
-                status,
-                name: vendor.name
+                email: user.email,
+                status: user.status,
+                name: user.name || "Vendor"
             }
         }, { status: 200 });
 

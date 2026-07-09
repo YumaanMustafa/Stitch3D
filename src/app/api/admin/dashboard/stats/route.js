@@ -15,6 +15,9 @@ export const dynamic = 'force-dynamic';
  * GET handler to fetch dashboard stats.
  * @param {Request} request 
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/dashboard/stats/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const admin = getUserFromRequest(request);

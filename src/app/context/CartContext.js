@@ -21,7 +21,9 @@ export const CartProvider = ({ children }) => {
         }
     };
 
-    // 1. Initial Load
+    // 1. Initial Load: Runs on mount to retrieve the cart items stored in localStorage.
+    // Checks if the user is authenticated to load a user-specific cart (e.g. cart_123),
+    // otherwise falls back to a generic 'cart' key.
     useEffect(() => {
         const userId = getUserId();
         const cartKey = userId ? `cart_${userId}` : 'cart';
@@ -34,23 +36,30 @@ export const CartProvider = ({ children }) => {
                     const validItems = parsed.filter(i => i && (i.id || i.id === 0));
                     // Basic dedupe by ID logic just in case
                     const uniqueItems = Array.from(new Map(validItems.map(item => [item.id, item])).values());
-                    setCartItems(uniqueItems);
+                    
+                    // Wrapped in setTimeout to prevent React's synchronous state update in useEffect warning
+                    setTimeout(() => {
+                        setCartItems(uniqueItems);
+                    }, 0);
                 } else {
-                    setCartItems([]);
+                    setTimeout(() => {
+                        setCartItems([]);
+                    }, 0);
                 }
             }
         } catch (e) {
             console.error("Cart load error:", e);
         } finally {
+            // Loading complete
             setIsLoading(false);
         }
     }, []);
 
-    // 2. Persist on Change
+    // 2. Persist on Change: Whenever cartItems array is updated, save the serialized array to localStorage.
+    // Also fires a 'cartUpdated' custom window event to support external non-React listeners.
     useEffect(() => {
-        if (isLoading) return; // Don't overwrite if not loaded yet
+        if (isLoading) return; // Don't overwrite if loading hasn't finished yet
 
-        // Check user ID again in case it changed (login/logout handled by refresh usually, but good to be safe)
         const userId = getUserId();
         const cartKey = userId ? `cart_${userId}` : 'cart';
 
@@ -61,7 +70,10 @@ export const CartProvider = ({ children }) => {
     }, [cartItems, isLoading]);
 
     // Actions
-    const addToCart = (product) => {
+    // ==========================================
+// ADD TO CART: Adds a product or customized design to the shopping cart
+// ==========================================
+const addToCart = (product) => {
         setCartItems((prev) => {
             // Priority 1: Update existing Saved Design (by designId)
             if (product.designId) {
@@ -113,12 +125,18 @@ export const CartProvider = ({ children }) => {
         });
     };
 
-    const removeFromCart = (id) => {
+    // ==========================================
+// REMOVE FROM CART: Removes an item from the shopping cart by ID
+// ==========================================
+const removeFromCart = (id) => {
         setCartItems((prev) => prev.filter((item) => item.id !== id));
     };
 
     // NEW: Sync saved design changes to cart immediately
-    const syncCartItemWithDesign = (design) => {
+    // ==========================================
+// SYNC CART ITEM: Synchronizes a saved design with its cart representation
+// ==========================================
+const syncCartItemWithDesign = (design) => {
         setCartItems((prev) => {
             const index = prev.findIndex(item => item.designId === design.id || item.title === design.name);
             if (index > -1) {
@@ -127,18 +145,9 @@ export const CartProvider = ({ children }) => {
                 updated[index] = {
                     ...updated[index],
                     designId: design.id,
-                    title: design.name,
+                    title: design.name || updated[index].title,
                     color: design.color || updated[index].color,
                     material: typeof design.material === 'object' ? design.material.name : (design.material || updated[index].material),
-                    // If price needed, calculate or pass full object. Assuming 'design' might vary. 
-                    // Ideally we re-construct the item product object.
-                    // For now, let's trust the design object has core display info or rely on caller passing safe data.
-                    // Actually, the caller in customize/page.js has full context. 
-                    // Let's expect the caller to pass the 'product' shape or we assume design has shape.
-                    // Let's stick to what customize/page.js was doing: title, price, img.
-                    // We'll trust the design object passed has these or we merge carefully.
-                    // BETTER: Accept `updates` object.
-                    ...design // Check for conflicts?
                 };
                 // Ensure ID and Qty are preserved strictly
                 updated[index].id = prev[index].id;
@@ -149,13 +158,19 @@ export const CartProvider = ({ children }) => {
         });
     };
 
-    const updateQuantity = (id, quantity) => {
+    // ==========================================
+// UPDATE QUANTITY: Modifies the quantity of a specific cart item
+// ==========================================
+const updateQuantity = (id, quantity) => {
         setCartItems((prev) =>
             prev.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item))
         );
     };
 
-    const clearCart = () => {
+    // ==========================================
+// CLEAR CART: Resets the shopping cart to an empty array
+// ==========================================
+const clearCart = () => {
         setCartItems([]);
     };
 

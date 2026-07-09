@@ -18,6 +18,9 @@ async function getVendorId(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/orders/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const vendorId = await getVendorId(request);
@@ -47,6 +50,7 @@ export async function GET(request) {
             (SELECT title FROM order_items oi WHERE oi.order_id = o.order_id LIMIT 1) as item_title,
             (SELECT color FROM order_items oi WHERE oi.order_id = o.order_id LIMIT 1) as color,
             (SELECT material FROM order_items oi WHERE oi.order_id = o.order_id LIMIT 1) as material,
+            (SELECT size FROM order_items oi WHERE oi.order_id = o.order_id LIMIT 1) as size,
             (SELECT design_id FROM order_items oi WHERE oi.order_id = o.order_id LIMIT 1) as design_id
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.customer_id
@@ -64,11 +68,12 @@ export async function GET(request) {
             total: `Rs ${row.total}`,
             status: row.status || "Processing",
             items: row.items_count || 1,
-            is_custom: row.design_id ? String(row.design_id).startsWith('design_') : false,
+            is_custom: row.design_id != null && isNaN(Number(row.design_id)),
             design_id: row.design_id,
             title: row.item_title || "Standard Order",
             color: row.color || "N/A",
             material: row.material || "N/A",
+            size: row.size || null,
             image: row.img_src || "https://images.unsplash.com/photo-1591561954557-26941169b49e?q=80&w=200"
         }));
 

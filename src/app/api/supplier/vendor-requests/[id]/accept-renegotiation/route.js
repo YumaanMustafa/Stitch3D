@@ -17,6 +17,9 @@ async function getSupplierFromToken(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/supplier/vendor-requests/[id]/accept-renegotiation/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const supplier = await getSupplierFromToken(request);

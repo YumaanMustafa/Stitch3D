@@ -18,6 +18,9 @@ async function getVendorId(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/orders/[id]/route.js
+// ==========================================
 export async function GET(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

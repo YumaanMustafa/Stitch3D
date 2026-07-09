@@ -139,6 +139,11 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
 // Separate component for lazy loading chart. Using Light Theme colors.
 function AdminChart() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [chartData, setChartData] = useState({
     series: [{ name: "New Users", data: [12, 19, 3, 5, 2, 3, 20] }, { name: "Orders", data: [5, 12, 1, 4, 1, 2, 12] }],
     options: {
@@ -160,6 +165,10 @@ function AdminChart() {
       legend: { show: false }
     },
   });
+
+  if (!mounted) {
+    return <div className="w-full h-full animate-pulse bg-slate-100 rounded-lg"></div>;
+  }
 
   return <ReactApexChart options={chartData.options} series={chartData.series} type="area" height="100%" />;
 }

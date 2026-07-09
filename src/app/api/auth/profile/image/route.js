@@ -10,6 +10,9 @@ import path from 'path';
  * Saves uploaded images to /public/uploads/profiles and updates user record.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/profile/image/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -38,14 +41,14 @@ export async function POST(req) {
         // Generate unique filename
         const filename = `${userPayload.id}_${Date.now()}${path.extname(file.name)}`;
         const filePath = path.join(uploadDir, filename);
-        
+
         await writeFile(filePath, buffer);
 
         const imagePath = `/uploads/profiles/${filename}`;
 
         // Update database
         await db.query(
-            "UPDATE users SET profile_image = ? WHERE user_id = ?",
+            "UPDATE users SET profile_picture = ? WHERE user_id = ?",
             [imagePath, userPayload.id]
         );
 

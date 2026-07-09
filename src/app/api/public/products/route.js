@@ -8,6 +8,9 @@ import db from '@/lib/db';
  * Used for the main marketplace/shop page.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/public/products/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);

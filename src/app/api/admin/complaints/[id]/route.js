@@ -7,6 +7,9 @@ import db from '@/lib/db';
  * @description Admin Complaints Single Update API.
  */
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/admin/complaints/[id]/route.js
+// ==========================================
 export async function PUT(req, { params }) {
     try {
         const adminPayload = getAdminFromRequest(req);

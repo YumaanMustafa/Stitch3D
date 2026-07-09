@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getChatUserId, getChatUserRole } from '../auth';
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/chat/contacts-supplier/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const userId = await getChatUserId(request);

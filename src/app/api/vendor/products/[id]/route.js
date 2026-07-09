@@ -13,6 +13,9 @@ async function getVendorId(request) {
 }
 
 // PUT: Update product
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/products/[id]/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendorId = await getVendorId(request);
@@ -40,6 +43,9 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE: Remove product
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/vendor/products/[id]/route.js
+// ==========================================
 export async function DELETE(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

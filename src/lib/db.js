@@ -6,12 +6,12 @@ import mysql from "mysql2/promise";
  * @description Database connection configuration using MySQL2 connection pool.
  * Establishes a reusable pool of connections to the database to handle concurrent requests efficiently.
  */
-const db = await mysql.createPool({
+const db = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASS || "",
-  database: process.env.DB_NAME || "stitch",
+  database: process.env.DB_NAME || "stitch3d",
   ssl: process.env.DB_HOST && process.env.DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : undefined,
   connectionLimit: 10,
   queueLimit: 0,

@@ -7,6 +7,9 @@ import db from '@/lib/db';
  * Fetches the 10 most recent active products to display as "Trending" on the home page.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/public/products/trending/route.js
+// ==========================================
 export async function GET(request) {
     try {
         // Fetch active vendor products, ordered by newest first (as a proxy for trending for now)
@@ -29,9 +32,7 @@ export async function GET(request) {
 
         return NextResponse.json(formatted, {
             headers: {
-                headers: {
-                    'Cache-Control': 'no-store, max-age=0'
-                }
+                'Cache-Control': 'no-store, max-age=0'
             }
         });
     } catch (error) {

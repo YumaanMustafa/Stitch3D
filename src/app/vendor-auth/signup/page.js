@@ -11,6 +11,8 @@ const VendorSignupSchema = Yup.object().shape({
     businessName: Yup.string().min(2, "Too short").required("Required"),
     email: Yup.string().email("Invalid email").required("Required"),
     phone: Yup.string().matches(/^\+?[0-9\s-]{10,}$/, "Invalid format").required("Required"),
+    shopAddress: Yup.string().required("Required"),
+    specialization: Yup.string().oneOf(["Biker", "Varsity", "Bomber", "Racer"], "Invalid specialization").required("Required"),
     password: Yup.string().min(8, "Min 8 chars").matches(/[a-zA-Z]/, "Need letter").matches(/[0-9]/, "Need number").required("Required"),
     confirmPassword: Yup.string().oneOf([Yup.ref('password'), null], "Passwords must match").required("Required"),
 });
@@ -68,7 +70,7 @@ export default function VendorSignup() {
           </div>
 
           <Formik
-            initialValues={{ businessName: "", email: "", phone: "", password: "", confirmPassword: "" }}
+            initialValues={{ businessName: "", email: "", phone: "", shopAddress: "", specialization: "", password: "", confirmPassword: "" }}
             validationSchema={VendorSignupSchema}
             onSubmit={handleSubmit}
           >
@@ -86,6 +88,25 @@ export default function VendorSignup() {
                      <ErrorMessage name="phone" component="div" className="text-[8px] text-rose-500 font-black uppercase px-1" />
                    </div>
                 </div>
+ 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Shop Address</label>
+                      <Field name="shopAddress" placeholder="Shop Address" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 focus:border-[#F97316] focus:bg-white rounded-2xl text-[11px] font-black text-slate-900 uppercase tracking-widest outline-none transition-all" />
+                      <ErrorMessage name="shopAddress" component="div" className="text-[8px] text-rose-500 font-black uppercase px-1" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Specialization</label>
+                      <Field as="select" name="specialization" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 focus:border-[#F97316] focus:bg-white rounded-2xl text-[11px] font-black text-slate-900 uppercase tracking-widest outline-none transition-all cursor-pointer">
+                        <option value="" disabled className="text-slate-400">Select Style</option>
+                        <option value="Biker">Biker</option>
+                        <option value="Varsity">Varsity</option>
+                        <option value="Bomber">Bomber</option>
+                        <option value="Racer">Racer</option>
+                      </Field>
+                      <ErrorMessage name="specialization" component="div" className="text-[8px] text-rose-500 font-black uppercase px-1" />
+                    </div>
+                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Email Address</label>

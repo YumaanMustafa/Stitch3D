@@ -11,6 +11,9 @@ import { sendEmail } from '@/lib/email';
  * - If Vendor: Sets status to 'pending' and notifies Admin.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/verify/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email, code } = await req.json();

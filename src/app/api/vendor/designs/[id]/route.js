@@ -17,6 +17,9 @@ async function getVendorId(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Fetch details of a specific design for the authenticated vendor
+// ==========================================
 export async function GET(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

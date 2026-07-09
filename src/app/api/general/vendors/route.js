@@ -7,9 +7,12 @@ import db from '@/lib/db';
  * Fetches all active vendors to allow customers to choose who fulfills their custom designs.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/general/vendors/route.js
+// ==========================================
 export async function GET() {
     try {
-        const [vendors] = await db.query("SELECT vendor_id, name, company_name FROM vendors");
+        const [vendors] = await db.query("SELECT vendor_id, name, company_name, shop_address, specialization FROM vendors");
         return NextResponse.json(vendors);
     } catch (error) {
         console.error("Failed to fetch vendors:", error);

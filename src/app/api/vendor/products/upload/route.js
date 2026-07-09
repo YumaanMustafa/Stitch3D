@@ -3,6 +3,9 @@ import { getVendorFromRequest, getVendorIdFromUser } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/vendor/products/upload/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const payload = getVendorFromRequest(req);

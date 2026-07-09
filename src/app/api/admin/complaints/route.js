@@ -7,6 +7,9 @@ import db from '@/lib/db';
  * @description Admin Complaints List API.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/complaints/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const adminPayload = getAdminFromRequest(req);

@@ -7,6 +7,9 @@ import db from '@/lib/db';
  * Fetches a single product by ID for public display.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/public/products/[id]/route.js
+// ==========================================
 export async function GET(request, { params }) {
     try {
         const { id } = await params;

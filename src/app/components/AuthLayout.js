@@ -16,16 +16,7 @@ export default function AuthLayout({ children, title, subtitle, heroTitle, heroS
     return (
         <div className="min-h-screen w-full flex bg-[#F8F9FA] text-[#0F172A]">
 
-            {/* Link to Home - Absolute */}
-            <div className="absolute top-6 left-6 z-20">
-                <Link
-                    href="/"
-                    className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#F97316] transition-colors"
-                >
-                    <ArrowLeft size={18} />
-                    Back to Home
-                </Link>
-            </div>
+
 
             {/* Left Panel - Visual (Desktop only) */}
             <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-[#1E293B] items-center justify-center">

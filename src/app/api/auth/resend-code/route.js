@@ -9,6 +9,9 @@ import { NextResponse } from "next/server";
  * Generates a new OTP and sends it to the unverified user's email.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/resend-code/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email } = await req.json();

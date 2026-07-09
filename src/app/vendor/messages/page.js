@@ -51,6 +51,7 @@ export default function VendorMessagesPage() {
                 setMessages(data);
                 if (!isPolling && data.length > 0) {
                     setContacts(prev => prev.map(c => c.id === contactId ? { ...c, unread_count: 0 } : c));
+                    window.dispatchEvent(new Event('messagesRead'));
                 }
             }
         } catch (err) {}

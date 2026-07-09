@@ -7,6 +7,9 @@ import db from '@/lib/db';
  * Fetches reviews and aggregated stats for a specific product.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/public/reviews/[productId]/route.js
+// ==========================================
 export async function GET(request, { params }) {
     try {
         const { productId } = await params;

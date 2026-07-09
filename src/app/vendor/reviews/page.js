@@ -144,7 +144,7 @@ export default function VendorReviewsPage() {
                                             value={replyText}
                                             onChange={(e) => setReplyText(e.target.value)}
                                             placeholder="WRITE A REPLY..."
-                                            className="w-full p-6 bg-slate-50 border-2 border-slate-50 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest outline-none focus:border-[#F97316] focus:bg-white transition-all min-h-[120px]"
+                                            className="w-full p-6 bg-slate-50 border-2 border-slate-50 rounded-[1.5rem] text-[11px] font-black tracking-widest outline-none focus:border-[#F97316] focus:bg-white transition-all min-h-[120px]"
                                         />
                                         <div className="flex gap-4">
                                             <button onClick={() => setReplyingTo(null)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cancel</button>

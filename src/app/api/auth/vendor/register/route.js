@@ -10,10 +10,13 @@ import { sendVerificationEmail } from '@/lib/email';
  * Initializes the email verification flow.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/vendor/register/route.js
+// ==========================================
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { businessName, email, password, phone } = body;
+    const { businessName, email, password, phone, shopAddress, specialization } = body;
 
     // 1. Check if email exists
     const [existing] = await db.execute("SELECT user_id FROM users WHERE email = ?", [email]);
@@ -35,10 +38,10 @@ export async function POST(request) {
     );
     const userId = userResult.insertId;
 
-    // 5. Create Vendor entry
+    // 5. Create Vendor entry (normalized, store shop_address/specialization)
     await db.execute(
-      "INSERT INTO vendors (user_id, name, email, password, company_name, phone_number, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
-      [userId, businessName, email, hashedPassword, businessName, phone]
+      "INSERT INTO vendors (user_id, name, company_name, phone_number, shop_address, specialization, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+      [userId, businessName, businessName, phone, shopAddress, specialization]
     );
 
     // 6. Send Email

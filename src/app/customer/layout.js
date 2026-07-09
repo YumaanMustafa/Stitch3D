@@ -118,7 +118,11 @@ export default function CustomerLayout({ children }) {
         router.replace("/customer-auth/login");
     };
 
-    if (loading) return null;
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+            <div className="w-8 h-8 rounded-full border-2 border-[#F97316] border-t-transparent animate-spin" />
+        </div>
+    );
 
     const initials = profile?.firstName ? profile.firstName[0].toUpperCase() : "C";
 
@@ -269,7 +273,7 @@ export default function CustomerLayout({ children }) {
                                         <NavLink href="/customer/dashboard" icon={<Package className="w-5 h-5" />} label="Dashboard" onClick={() => setIsMobileMenuOpen(false)} />
                                         <NavLink href="/customer/orders" icon={<Clock className="w-5 h-5" />} label="My Orders" onClick={() => setIsMobileMenuOpen(false)} />
                                         <NavLink href="/customer/designs" icon={<Heart className="w-5 h-5" />} label="Saved Designs" onClick={() => setIsMobileMenuOpen(false)} />
-                                        <NavLink href="/customer/messages" icon={<div className="w-5 h-5" />} label="Messages" onClick={() => setIsMobileMenuOpen(false)} />
+                                        <NavLink href="/customer/messages" icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>} label="Messages" onClick={() => setIsMobileMenuOpen(false)} />
                                         <div className="pt-6 mt-6 border-t border-slate-100">
                                             <NavLink href="/customer/customize" icon={<Zap className="w-5 h-5 text-[var(--color-brand)]" />} label="Start Designing" onClick={() => setIsMobileMenuOpen(false)} />
                                         </div>

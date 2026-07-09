@@ -13,6 +13,9 @@ async function getVendorFromToken(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/material-requests/[id]/accept/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendor = await getVendorFromToken(request);

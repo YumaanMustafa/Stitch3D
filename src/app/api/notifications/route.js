@@ -7,6 +7,9 @@ import db from "@/lib/db";
  * @description Universal Notifications API.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/notifications/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const user = getUserFromRequest(req);
@@ -35,6 +38,9 @@ export async function GET(req) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/notifications/route.js
+// ==========================================
 export async function PUT(req) {
     try {
         const user = getUserFromRequest(req);

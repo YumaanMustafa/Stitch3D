@@ -78,9 +78,11 @@ export default function CheckoutPage() {
     card_cvv: "",
   });
 
-  /* =========================
-     LOAD CART + AUTH
-  ========================== */
+  /* =========================================================================
+     1. LOAD CART & AUTHENTICATION
+     Reads user session, retrieves their specific cart key, and populates
+     pre-filled shipping details from their saved Customer Profile.
+     ========================================================================= */
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -89,15 +91,21 @@ export default function CheckoutPage() {
     }
 
     try {
+      // Decode JWT to extract unique userId to fetch the user-specific cart from localStorage
       const payload = JSON.parse(atob(token.split('.')[1]));
       const userId = payload.id || payload.userId;
       const cartKey = userId ? `cart_${userId}` : 'cart';
       const cart = JSON.parse(localStorage.getItem(cartKey) || "[]");
-      setCartItems(cart);
+      setTimeout(() => {
+        setCartItems(cart);
+      }, 0);
     } catch (e) {
-      setCartItems([]);
+      setTimeout(() => {
+        setCartItems([]);
+      }, 0);
     }
 
+    // Retrieve saved user profile details to auto-fill the shipping form
     fetch("/api/customer/profile", {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -118,9 +126,11 @@ export default function CheckoutPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  /* =========================
-     PRICE CALCULATIONS
-  ========================== */
+  /* =========================================================================
+     2. PRICE CALCULATIONS
+     Computes order financials including subtotal, progressive shipping costs, 
+     taxes, and final order total.
+     ========================================================================= */
   const subtotal = useMemo(
     () =>
       cartItems.reduce(
@@ -130,23 +140,25 @@ export default function CheckoutPage() {
     [cartItems]
   );
 
+  // Apply free shipping if order exceeds the threshold limits
   const shippingFee =
     subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
 
-  const taxAmount = Math.round((subtotal + shippingFee) * TAX_RATE);
+  const taxAmount = Math.round(subtotal * TAX_RATE);
   const total = subtotal + shippingFee + taxAmount;
 
-  /* =========================
-     HANDLERS
-  ========================== */
+  /* =========================================================================
+     3. HANDLERS AND SUBMISSIONS
+     ========================================================================= */
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  // Submits checkout data: updates customer profile first, then posts order to API
   const handlePlaceOrder = async (values, { setSubmitting }) => {
     const token = localStorage.getItem("token");
 
     try {
-      /* 1️⃣ SAVE CUSTOMER PROFILE */
+      /* Step A: Save or update the customer profile with the latest shipping address */
       await fetch("/api/customer/profile", {
         method: "POST",
         headers: {
@@ -156,7 +168,7 @@ export default function CheckoutPage() {
         body: JSON.stringify(values),
       });
 
-      /* 2️⃣ PLACE ORDER (COD) */
+      /* Step B: Place the official order in the DB */
       const res = await fetch("/api/customer/orders", {
         method: "POST",
         headers: {
@@ -176,6 +188,7 @@ export default function CheckoutPage() {
 
       if (!res.ok) throw new Error("Order failed");
 
+      // Clean up the user-specific cart from localStorage on order success
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userId = payload.id || payload.userId;
@@ -184,7 +197,7 @@ export default function CheckoutPage() {
       } catch (e) {
         localStorage.removeItem("cart"); // Fallback
       }
-      clearCart(); // NEW: sync context!
+      clearCart(); // Sync Context Cart
       router.push("/customer/orders?success=true");
     } catch (err) {
       console.error(err);
@@ -196,6 +209,7 @@ export default function CheckoutPage() {
 
   if (loading) return null;
 
+  // Render empty cart warning if user has no items to check out
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">

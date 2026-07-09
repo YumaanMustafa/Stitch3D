@@ -16,12 +16,19 @@ import DesignViewer from "@/app/components/DesignViewer";
 
 export default function DesignRequests() {
   const router = useRouter();
+  // State hooks to manage the component state:
+  // - requests: List of user design requests retrieved from the database
+  // - viewerDesignId: ID of the design currently loaded in the 3D Viewer modal
+  // - isDesignViewerOpen: Toggle state for showing/hiding the 3D Viewer modal
+  // - rejectModalOpen: Toggle state for showing/hiding the reject confirmation modal
+  // - selectedDesignId: The design ID currently selected for status action (e.g. rejection)
   const [requests, setRequests] = useState([]);
   const [viewerDesignId, setViewerDesignId] = useState(null);
   const [isDesignViewerOpen, setIsDesignViewerOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedDesignId, setSelectedDesignId] = useState(null);
 
+  // Helper function to submit a rejection status update when confirmed via the modal
   const confirmReject = () => {
     if (selectedDesignId) {
       updateStatus(selectedDesignId, "Rejected");
@@ -29,15 +36,17 @@ export default function DesignRequests() {
     }
   };
 
+  // Effect hook to fetch design requests on component mount
   useEffect(() => {
     const fetchDesignRequests = async () => {
       try {
         const token = localStorage.getItem("vendorToken");
-        // Use relative URL for consistency and proxy handoff
+        // Fetch design requests specific to the authenticated vendor
         const res = await fetch("/api/vendor/designs", {
           headers: { Authorization: `Bearer ${token}` }
         });
 
+        // Redirect to login if token is expired or invalid
         if (!res.ok) {
           if (res.status === 401) {
             console.warn("Unauthorized - Redirecting to login");
@@ -53,8 +62,10 @@ export default function DesignRequests() {
       }
     };
     fetchDesignRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Updates the design submission review status (e.g., Approved, Rejected, In Review)
   const updateStatus = async (id, newStatus) => {
     try {
       const res = await fetch(`/api/vendor/designs/${id}/status`, {
@@ -63,6 +74,8 @@ export default function DesignRequests() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error("Failed to update status");
+      
+      // Update local state arrays to reflect status changes immediately
       setRequests(requests.map(req => req.design_id === id ? { ...req, status: newStatus } : req));
     } catch (err) {
       console.error(err.message);
@@ -88,7 +101,7 @@ export default function DesignRequests() {
       <div className="grid md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-6">
         {requests.map(req => (
           <div key={req.design_id} className="bg-white rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50 p-4 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-slate-200 group flex flex-col">
-            
+
             {/* Image Thumbnail */}
             <div className="relative w-full aspect-square rounded-[1.5rem] overflow-hidden mb-5 bg-slate-50 border border-slate-100">
               <Image src={req.preview_url} alt={req.title} fill className="object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
@@ -98,20 +111,19 @@ export default function DesignRequests() {
             <div className="px-2 flex-1 flex flex-col">
               <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase leading-tight mb-1">{req.title}</h2>
               <p className="text-[10px] font-black text-[#F97316] uppercase tracking-widest mb-3">By {req.user_name}</p>
-              
+
               {req.notes && (
-                <p className="text-sm font-medium text-slate-500 italic mb-4 line-clamp-2">"{req.notes}"</p>
+                <p className="text-sm font-medium text-slate-500 italic mb-4 line-clamp-2">&quot;{req.notes}&quot;</p>
               )}
-              
+
               <div className="flex items-center justify-between mb-6 mt-auto">
                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {new Date(req.created_at).toLocaleDateString()}
                 </span>
-                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                  req.status === "Approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.status === "Approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
                   req.status === "Rejected" ? "bg-rose-50 text-rose-600 border-rose-100" :
-                  "bg-orange-50 text-orange-600 border-orange-100"
-                }`}>
+                    "bg-orange-50 text-orange-600 border-orange-100"
+                  }`}>
                   {req.status}
                 </span>
               </div>
@@ -130,7 +142,7 @@ export default function DesignRequests() {
               </div>
 
               {/* View Full Design */}
-              <button 
+              <button
                 onClick={() => { setViewerDesignId(req.design_id); setIsDesignViewerOpen(true); }}
                 className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all"
               >
@@ -152,12 +164,12 @@ export default function DesignRequests() {
         isDestructive={true}
       />
 
-      <Modal isOpen={isDesignViewerOpen} onClose={() => setIsDesignViewerOpen(false)} title="Interactive Design Viewer" maxWidth="max-w-2xl">
+      <Modal isOpen={isDesignViewerOpen} onClose={() => setIsDesignViewerOpen(false)} title="Vendor Design Viewer" maxWidth="max-w-2xl">
         <div className="space-y-6 p-4">
-            {viewerDesignId && <DesignViewer designId={viewerDesignId} />}
-            <div className="flex justify-end pt-4">
-                <button onClick={() => setIsDesignViewerOpen(false)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all">Close Viewer</button>
-            </div>
+          {viewerDesignId && <DesignViewer designId={viewerDesignId} />}
+          <div className="flex justify-end pt-4">
+            <button onClick={() => setIsDesignViewerOpen(false)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all">Close Viewer</button>
+          </div>
         </div>
       </Modal>
     </div>

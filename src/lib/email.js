@@ -109,3 +109,62 @@ export async function sendEmail({ to, subject, html }) {
     // Don't throw, just log, to avoid breaking the main flow
   }
 }
+
+/**
+ * Send account approval or rejection email
+ * @param {string} email - recipient email
+ */
+export async function sendAccountStatusEmail(email, status) {
+  const isApproved = status === "active";
+  const subject = isApproved
+    ? "Stitch Account Approved"
+    : "Stitch Account Application Status Update";
+
+  const contentHtml = isApproved
+    ? `
+      <div style="font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:10px;line-height:1.6;">
+        <h2 style="color:#10b981;">Congratulations!</h2>
+        <p>We are pleased to inform you that your account has been successfully created and approved.</p>
+        <p>You can now log in to your account and start listing and selling your products on our platform. We look forward to having you as part of our seller community.</p>
+        <p><strong>To get started:</strong></p>
+        <ul>
+          <li>Log in to your account.</li>
+          <li>Complete your seller profile (if applicable).</li>
+          <li>Add your products and begin selling.</li>
+        </ul>
+        <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+        <p>Thank you for choosing our platform. We wish you great success in your selling journey!</p>
+        <p>Best regards,<br>Stitch Team</p>
+      </div>
+    `
+    : `
+      <div style="font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:10px;line-height:1.6;">
+        <h2 style="color:#ef4444;">Application Update</h2>
+        <p>After reviewing your application, we regret to inform you that we are unable to approve your seller account at this time.</p>
+        <p>This decision may be due to incomplete information, failure to meet our seller requirements, or other verification-related issues. If applicable, you are welcome to review your application, make the necessary corrections, and submit a new request for consideration.</p>
+        <p>If you believe this decision was made in error or you require further clarification, please feel free to contact our support team.</p>
+        <p>We appreciate your interest in our platform and thank you for your understanding.</p>
+        <p>Best regards,<br>Stitch Team</p>
+      </div>
+    `;
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("⚠️ Email credentials missing in .env. Skipping email send.");
+    console.log(`🔐 [MOCK EMAIL] To: ${email} | Subject: ${subject} | Status: ${status}`);
+    return;
+  }
+
+  try {
+    const mailOptions = {
+      from: `"Stitch" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: subject,
+      html: contentHtml,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Account status email sent to ${email} (Status: ${status})`);
+  } catch (err) {
+    console.error("❌ Error sending account status email:", err);
+  }
+}

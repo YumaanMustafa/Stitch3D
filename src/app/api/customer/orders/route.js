@@ -11,9 +11,12 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
+// =========================================================================
+// POST HANDLER: Creates sub-orders split per-vendor for checkout cart items
+// =========================================================================
 export async function POST(request) {
     try {
-        // 1. Auth Check
+        // 1. Authentication check: read and verify Bearer JWT from headers
         const authHeader = request.headers.get('authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -28,7 +31,7 @@ export async function POST(request) {
 
         const userId = decoded.id || decoded.userId || decoded.user_id;
 
-        // 2. Parse Body
+        // 2. Parse request payload details (cart items, shipping address, financial totals)
         const body = await request.json();
         const { items, shipping, total, subtotal, shippingFee } = body;
 
@@ -36,7 +39,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
         }
 
-        // 3. Get Customer ID
+        // 3. Resolve Customer ID: checks if customer profile exists, otherwise auto-generates one
         const [customerRows] = await db.query('SELECT customer_id FROM customers WHERE user_id = ?', [userId]);
         let customerId;
 
@@ -47,13 +50,13 @@ export async function POST(request) {
             customerId = customerRows[0].customer_id;
         }
 
-        // 4. Group items by Vendor
+        // 4. Split and group checkout items by Vendor (multi-vendor checkout support)
         const vendorGroups = {};
         for (const item of items) {
-            // 4.1 Identify Product ID
+            // 4.1 Identify design/product ID
             let actualDesignId = item.rawId || item.designId;
 
-            // Extract from 'ready_123' if needed, or use plain numeric ID
+            // Extract numeric ID from prefixed keys (e.g. ready_12) or standard integers
             if (!actualDesignId && item.id) {
                 const idStr = item.id.toString();
                 if (idStr.startsWith('ready_')) {
@@ -63,17 +66,18 @@ export async function POST(request) {
                 }
             }
 
-            // 4.2 Determine Vendor
+            // 4.2 Determine corresponding Vendor ID
             let vendorId = item.artisanId || item.vendorId || null;
             if (vendorId) {
                 // vendorId already set from cart item
             } else if (actualDesignId && !isNaN(Number(actualDesignId)) && Number(actualDesignId) > 0) {
+                // Lookup vendor owner of ready-made product Catalog item
                 const [productRows] = await db.query('SELECT vendor_id FROM vendor_products WHERE id = ?', [actualDesignId]);
                 if (productRows.length > 0) {
                     vendorId = productRows[0].vendor_id;
                 }
             } else if (item.title) {
-                // Last ditch effort: find by title if ID is missing (robustness)
+                // Fallback lookup: match vendor ownership based on product name
                 const [productRows] = await db.query('SELECT vendor_id FROM vendor_products WHERE name = ? LIMIT 1', [item.title]);
                 if (productRows.length > 0) {
                     vendorId = productRows[0].vendor_id;
@@ -81,9 +85,8 @@ export async function POST(request) {
             }
 
             if (!vendorId) {
-                // FALLBACK: Assign to default platform vendor (Vendor 1) 
-                // so custom designs don't disappear into NULL bucket.
-                vendorId = 1;
+                // Fallback to null to prevent foreign key errors if database records are empty
+                vendorId = null;
             }
 
             // 4.3 Attach resolved IDs to item for insertion
@@ -99,17 +102,18 @@ export async function POST(request) {
         const totalSubtotal = Object.values(vendorGroups).reduce((sum, g) => sum + g.subtotal, 0);
         const createdOrderIds = [];
 
-        // 5. Create Sub-Orders per Vendor
+        // 5. Create Sub-Orders per Vendor (splits order entries to prevent order cross-contamination)
         for (const key in vendorGroups) {
             const group = vendorGroups[key];
             const vId = group.vendorId === 'none' ? null : group.vendorId;
 
-            // Proportional distribution of shipping and tax
+            // Proportional distribution of shipping and tax fees based on subtotal ratios
             const ratio = totalSubtotal > 0 ? group.subtotal / totalSubtotal : 1 / Object.keys(vendorGroups).length;
             const groupShipping = (parseFloat(shippingFee) || 0) * ratio;
             const groupTax = (parseFloat(body.tax) || 0) * ratio;
             const groupTotal = group.subtotal + groupShipping + groupTax;
 
+            // Insert single sub-order row
             const [orderResult] = await db.query(
                 `INSERT INTO orders (customer_id, vendor_id, subtotal, shipping_fee, tax, total, shipping_method, status, created_at) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
@@ -118,7 +122,7 @@ export async function POST(request) {
             const orderId = orderResult.insertId;
             createdOrderIds.push(orderId);
 
-            // 6. Insert Items for this Sub-Order
+            // 6. Insert Items for this Sub-Order in bulk
             const itemValues = group.items.map(item => [
                 orderId,
                 vId,
@@ -138,7 +142,7 @@ export async function POST(request) {
                 [itemValues]
             );
 
-            // 7. Notify Vendor
+            // 7. Notify Vendor: logs alert entry into notifications table
             if (vId) {
                 try {
                     const [vendorRows] = await db.query('SELECT user_id FROM vendors WHERE vendor_id = ?', [vId]);

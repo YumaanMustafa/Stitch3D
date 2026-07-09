@@ -15,6 +15,9 @@ export const dynamic = 'force-dynamic';
  * GET handler to retrieve list of users.
  * Filters out unverified or pending vendors to show only active participants.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/users/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const admin = getUserFromRequest(request);

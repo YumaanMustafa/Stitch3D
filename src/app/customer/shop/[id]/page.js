@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Check, ShoppingBag, ShoppingCart, CheckCircle, Ruler, Info, X, Star, User, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, ShoppingBag, ShoppingCart, CheckCircle, Ruler, Info, X, Star, User, MessageSquare, Send, ShieldCheck, MoreVertical, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/app/context/CartContext";
 
@@ -22,6 +22,9 @@ export default function ProductDetailPage() {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [newReview, setNewReview] = useState({ rating: 5, comment: "" });
     const [customerId, setCustomerId] = useState(null);
+    const [activeDropdown, setActiveDropdown] = useState(null);
+    const [reviewToDelete, setReviewToDelete] = useState(null);
+    const [selectedSize, setSelectedSize] = useState(null);
 
     useEffect(() => {
         if (!id) return;
@@ -130,8 +133,44 @@ export default function ProductDetailPage() {
         }
     };
 
+    const handleDeleteReview = async () => {
+        const token = localStorage.getItem("token");
+        try {
+            const res = await fetch(`/api/customer/reviews?productId=${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                setToastMessage("Review deleted successfully!");
+                setNewReview({ rating: 5, comment: "" });
+                
+                // Refresh reviews
+                const revRes = await fetch(`/api/public/reviews/${id}`);
+                const revData = await revRes.json();
+                setReviews(revData.reviews || []);
+                setReviewStats(revData.stats || { averageRating: 0, reviewCount: 0 });
+            } else {
+                setToastMessage(data.message || data.error || "Failed to delete review");
+            }
+            setReviewToDelete(null);
+            setTimeout(() => setToastMessage(""), 3000);
+        } catch (err) {
+            console.error(err);
+            setReviewToDelete(null);
+        }
+    };
+
     const handleAddToCart = () => {
         if (!product) return;
+        if (!selectedSize) {
+            setToastMessage("Please select a size before adding to cart.");
+            setTimeout(() => setToastMessage(""), 3000);
+            return;
+        }
         addToCart({
             id: `ready_${product.id}`, 
             rawId: product.id,
@@ -140,10 +179,11 @@ export default function ProductDetailPage() {
             image: product.image,
             color: "Standard",
             material: "Leather",
+            size: selectedSize,
             isCustom: false
         });
 
-        setToastMessage(`${product.name} added to cart!`);
+        setToastMessage(`${product.name} (${selectedSize}) added to cart!`);
         setTimeout(() => setToastMessage(""), 3000);
     };
 
@@ -222,7 +262,7 @@ export default function ProductDetailPage() {
                         </div>
 
                         {/* Guides Section */}
-                        <div className="flex gap-4 mb-8">
+                        <div className="flex gap-4 mb-6">
                             <button
                                 onClick={() => setActiveModal('size')}
                                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:border-orange-300 hover:text-orange-600 transition-all shadow-sm"
@@ -235,6 +275,28 @@ export default function ProductDetailPage() {
                             >
                                 <Info size={16} /> Material Guide
                             </button>
+                        </div>
+
+                        {/* Size Selector */}
+                        <div className="mb-8">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                                Select Size {selectedSize && <span className="text-orange-600">— {selectedSize}</span>}
+                            </p>
+                            <div className="flex gap-2">
+                                {['S', 'M', 'L', 'XL'].map(size => (
+                                    <button
+                                        key={size}
+                                        onClick={() => setSelectedSize(size)}
+                                        className={`flex-1 py-3 rounded-xl text-sm font-black uppercase tracking-widest border-2 transition-all ${
+                                            selectedSize === size
+                                                ? 'bg-slate-900 text-white border-slate-900 shadow-lg'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Action Area */}
@@ -385,16 +447,39 @@ export default function ProductDetailPage() {
                                                </div>
                                            </div>
                                        </div>
-                                       <div className="flex gap-0.5">
-                                           {[1, 2, 3, 4, 5].map((s) => (
-                                               <Star 
-                                                   key={s} 
-                                                   size={12} 
-                                                   className={s <= r.rating ? "text-amber-400" : "text-slate-200"} 
-                                           fill={s <= r.rating ? "currentColor" : "none"} 
-                                               />
-                                           ))}
-                                       </div>
+                                       <div className="flex items-center gap-3">
+                                            <div className="flex gap-0.5">
+                                                {[1, 2, 3, 4, 5].map((s) => (
+                                                    <Star 
+                                                        key={s} 
+                                                        size={12} 
+                                                        className={s <= r.rating ? "text-amber-400" : "text-slate-200"} 
+                                                fill={s <= r.rating ? "currentColor" : "none"} 
+                                                    />
+                                                ))}
+                                            </div>
+                                            
+                                            {r.customer_id === customerId && (
+                                                <div className="relative">
+                                                    <button 
+                                                        onClick={() => setActiveDropdown(activeDropdown === r.id ? null : r.id)}
+                                                        className="p-1 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                    {activeDropdown === r.id && (
+                                                        <div className="absolute right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-10 w-28">
+                                                            <button
+                                                                onClick={() => { setReviewToDelete(r.id); setActiveDropdown(null); }}
+                                                                className="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            >
+                                                                <Trash2 size={12} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                    </div>
                                     <p className="text-slate-600 text-sm leading-relaxed mb-4 italic">
                                         "{r.comment || "No comment provided."}"
@@ -434,6 +519,42 @@ export default function ProductDetailPage() {
                         <CheckCircle className="w-5 h-5 text-green-500" />
                         <span className="font-bold text-sm tracking-wide">{toastMessage}</span>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Custom Review Delete Confirmation Modal */}
+            <AnimatePresence>
+                {reviewToDelete && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl border border-slate-200 p-8 text-center"
+                        >
+                            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Trash2 size={28} />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 mb-2">Delete Review?</h3>
+                            <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                                Are you sure you want to delete your review? This action cannot be undone.
+                            </p>
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setReviewToDelete(null)}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteReview}
+                                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-500/20"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 

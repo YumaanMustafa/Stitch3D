@@ -18,6 +18,9 @@ async function verifyAdmin(request) {
     } catch { return false; }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/designs/route.js
+// ==========================================
 export async function GET(request) {
     if (!await verifyAdmin(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

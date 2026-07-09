@@ -10,6 +10,9 @@ import { NextResponse } from "next/server";
  * Authenticates users (Customers/Vendors), checks email verification status, and issues JWT tokens.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/login/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email, password } = await req.json();

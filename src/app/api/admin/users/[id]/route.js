@@ -23,6 +23,9 @@ async function verifyAdmin(request) {
  * @param {Request} request 
  * @param {Object} params - { id }
  */
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/admin/users/[id]/route.js
+// ==========================================
 export async function DELETE(request, { params }) {
     if (!await verifyAdmin(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

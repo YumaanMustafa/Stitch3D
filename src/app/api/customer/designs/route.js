@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
+// Helper to authenticate user and extract user_id from authorization header JWT token
 async function getUserId(request) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
@@ -22,9 +23,9 @@ async function getUserId(request) {
     }
 }
 
-/**
- * GET handler to fetch user's saved designs.
- */
+// =========================================================================
+// GET HANDLER: Fetch all saved designs for the logged-in customer
+// =========================================================================
 export async function GET(request) {
     const userId = await getUserId(request);
 
@@ -33,9 +34,10 @@ export async function GET(request) {
     }
 
     try {
-        // Filter by user_id
+        // Query designs table filtering by the authenticated customer's user_id
         const [rows] = await db.query('SELECT * FROM customized_designs WHERE user_id = ? ORDER BY created_at DESC', [userId]);
 
+        // Deserialize views JSON string back into JS object representation for the frontend
         const designs = rows.map(d => ({
             ...d,
             views: d.views ? JSON.parse(d.views) : {}
@@ -48,6 +50,9 @@ export async function GET(request) {
     }
 }
 
+// =========================================================================
+// POST HANDLER: Save or update a customized design in the DB
+// =========================================================================
 export async function POST(request) {
     const userId = await getUserId(request);
     if (!userId) {
@@ -61,31 +66,34 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid design data' }, { status: 400 });
         }
 
+        // Generate stable design ID if this is a new custom design submission
         const id = newDesign.id || `design_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const name = newDesign.name || 'Custom Jacket';
         const color = newDesign.color || 'black';
         const material = newDesign.material || 'cowhide';
         const vendorId = newDesign.vendorId || null;
+        
+        // Serialize metadata structures (views and canvas snapshots) into JSON strings for database storage
         const views = typeof newDesign.views === 'string' ? newDesign.views : JSON.stringify(newDesign.views);
         const snapshots = typeof newDesign.snapshots === 'string' ? newDesign.snapshots : JSON.stringify(newDesign.snapshots || {});
         const preview = newDesign.previewImage || '';
 
-        // Check if exists
+        // Check if the design already exists in the database
         const [existing] = await db.query('SELECT id, user_id FROM customized_designs WHERE id = ?', [id]);
 
         if (existing.length > 0) {
-            // Verify ownership
+            // Guard: Enforce strict ownership validation to prevent cross-account editing
             if (existing[0].user_id !== userId) {
                 return NextResponse.json({ error: 'Forbidden: Cannot edit others design' }, { status: 403 });
             }
 
-            // Update
+            // Update existing design record
             await db.query(
                 'UPDATE customized_designs SET name = ?, color = ?, material = ?, vendor_id = ?, views = ?, snapshots = ?, preview = ?, created_at = NOW() WHERE id = ?',
                 [name, color, material, vendorId, views, snapshots, preview, id]
             );
         } else {
-            // Insert with user_id
+            // Create new design record
             await db.query(
                 'INSERT INTO customized_designs (id, user_id, name, color, material, vendor_id, views, snapshots, preview, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
                 [id, userId, name, color, material, vendorId, views, snapshots, preview]
@@ -111,6 +119,9 @@ export async function POST(request) {
     }
 }
 
+// =========================================================================
+// DELETE HANDLER: Delete a customized design from the database
+// =========================================================================
 export async function DELETE(request) {
     const userId = await getUserId(request);
     if (!userId) {
@@ -125,7 +136,7 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'ID is required' }, { status: 400 });
         }
 
-        // Verify ownership
+        // Fetch design to verify ownership before performing deletion
         const [existing] = await db.query('SELECT user_id FROM customized_designs WHERE id = ?', [id]);
         if (existing.length === 0) {
             return NextResponse.json({ error: 'Design not found' }, { status: 404 });
@@ -134,6 +145,7 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
+        // Delete design record
         await db.query('DELETE FROM customized_designs WHERE id = ?', [id]);
 
         return NextResponse.json({ success: true, message: 'Design deleted' });

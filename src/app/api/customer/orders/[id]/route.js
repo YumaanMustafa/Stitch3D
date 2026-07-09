@@ -10,6 +10,9 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/customer/orders/[id]/route.js
+// ==========================================
 export async function GET(request, { params }) {
     try {
         const { id } = await params;
@@ -39,6 +42,9 @@ export async function GET(request, { params }) {
             SELECT 
                 CONCAT('ORD-', o.order_id) as id,
                 o.created_at,
+                o.subtotal,
+                o.tax,
+                o.shipping_fee,
                 o.total,
                 o.status,
                 o.shipping_method as shipping,
@@ -50,10 +56,14 @@ export async function GET(request, { params }) {
                 c.postal_code,
                 u.first_name,
                 u.last_name,
-                u.email
+                u.email,
+                v.name as vendor_name,
+                v.company_name as vendor_company,
+                v.specialization as vendor_specialization
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
             JOIN users u ON c.user_id = u.user_id
+            LEFT JOIN vendors v ON o.vendor_id = v.vendor_id
             WHERE o.order_id = ? AND c.user_id = ?
         `, [dbId, userId]);
 
@@ -69,7 +79,10 @@ export async function GET(request, { params }) {
                 title as name,
                 quantity as qty,
                 price,
-                img_src as image
+                img_src as image,
+                color,
+                material,
+                size
             FROM order_items
             WHERE order_id = ?
         `, [dbId]);
@@ -82,6 +95,9 @@ export async function GET(request, { params }) {
     }
 }
 
+// ==========================================
+// DELETE HANDLER: Handles DELETE requests for src/app/api/customer/orders/[id]/route.js
+// ==========================================
 export async function DELETE(request, { params }) {
     try {
         const { id } = await params;

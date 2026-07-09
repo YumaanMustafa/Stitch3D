@@ -26,6 +26,9 @@ async function getUserId(request) {
 /**
  * GET handler to fetch user's uploads.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/common/uploads/route.js
+// ==========================================
 export async function GET(request) {
     const userId = await getUserId(request);
     if (!userId) {
@@ -41,6 +44,9 @@ export async function GET(request) {
     }
 }
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/common/uploads/route.js
+// ==========================================
 export async function POST(request) {
     const userId = await getUserId(request);
     if (!userId) {

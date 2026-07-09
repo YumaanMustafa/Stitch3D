@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getChatUserId } from '../auth.js';
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/chat/unread/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const auth = await getChatUserId(request);

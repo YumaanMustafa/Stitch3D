@@ -54,7 +54,7 @@ export default function CartPage() {
     [cartItems]
   );
 
-  const shippingFee = 0; // Free shipping for premium users
+  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shippingFee;
 
   /* ================= HANDLERS ================= */
@@ -132,7 +132,7 @@ export default function CartPage() {
                 >
                   <div className="relative w-32 h-32 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center overflow-hidden">
                     <Image
-                      src={item.img || '/assets/placeholder-jacket.png'}
+                      src={item.img || item.image || '/assets/placeholder-jacket.png'}
                       alt={item.title}
                       fill
                       className="object-contain p-2 mix-blend-multiply"

@@ -18,6 +18,9 @@ async function getSupplierFromToken(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/supplier/settings/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const decoded = await getSupplierFromToken(request);
@@ -46,6 +49,9 @@ export async function GET(request) {
     }
 }
 
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/supplier/settings/route.js
+// ==========================================
 export async function PUT(request) {
     try {
         const decoded = await getSupplierFromToken(request);

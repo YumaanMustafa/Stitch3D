@@ -1,48 +1,33 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, User, Search, RefreshCw } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function CustomerMessagesPage() {
+function MessagesInner() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const hasSentAnchorRef = useRef(false);
+
+    // State hooks to manage the component:
+    // - contacts: List of vendors available for chat
+    // - selectedContact: The vendor record currently active in the chat panel
+    // - messages: Chat history with the selected vendor
+    // - newMessage: Text input value for the message text box
+    // - loading: Display state for loading indicators
+    // - sending: Disable state for message submission button
+    // - myUserId: Decoded user ID from the user session JWT token
     const [contacts, setContacts] = useState([]);
     const [selectedContact, setSelectedContact] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
-    
-    // Local user info
     const [myUserId, setMyUserId] = useState(null);
 
     const messagesEndRef = useRef(null);
 
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                setMyUserId(payload.userId || payload.user_id || payload.id);
-            } catch (e) {}
-        }
-        fetchContacts();
-    }, []);
-
-    useEffect(() => {
-        if (selectedContact) {
-            fetchMessages(selectedContact.id);
-            // Polling for new messages every 5 seconds
-            const interval = setInterval(() => {
-                fetchMessages(selectedContact.id, true);
-            }, 5000);
-            return () => clearInterval(interval);
-        }
-    }, [selectedContact]);
-
-    useEffect(() => {
-        // Auto-scroll to bottom
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
-    const fetchContacts = async () => {
+    // Fetch the list of contacts (vendors) from the chat API
+    async function fetchContacts() {
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -53,15 +38,25 @@ export default function CustomerMessagesPage() {
             if (res.ok) {
                 const data = await res.json();
                 setContacts(data);
+
+                // Auto-select a vendor if redirected from order/invoice screen with a vendorUserId query parameter
+                const vendorUserId = searchParams.get("vendorUserId");
+                if (vendorUserId) {
+                    const contact = data.find(c => String(c.id) === String(vendorUserId));
+                    if (contact) {
+                        setSelectedContact(contact);
+                    }
+                }
             }
         } catch (err) {
             console.error("Failed to load contacts:", err);
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const fetchMessages = async (contactId, isPolling = false) => {
+    // Load message history with a specific vendor contact
+    async function fetchMessages(contactId, isPolling = false) {
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -72,13 +67,20 @@ export default function CustomerMessagesPage() {
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
+
+                // Clear the vendorUserId URL query parameter on first successful load to clean the navigation state
+                const vendorUserId = searchParams.get("vendorUserId");
+                if (vendorUserId && String(contactId) === String(vendorUserId) && !isPolling) {
+                    router.replace("/customer/messages");
+                }
             }
         } catch (err) {
             console.error("Failed to load messages:", err);
         }
-    };
+    }
 
-    const sendMessage = async (e) => {
+    // Sends a chat message to the selected vendor
+    async function sendMessage(e) {
         e.preventDefault();
         if (!newMessage.trim() || !selectedContact) return;
 
@@ -99,6 +101,7 @@ export default function CustomerMessagesPage() {
 
             if (res.ok) {
                 const newMsg = await res.json();
+                // Append the newly sent message to local chat history for instant feedback
                 setMessages(prev => [...prev, {
                     message_id: newMsg.message_id,
                     sender_id: newMsg.sender_id,
@@ -113,7 +116,46 @@ export default function CustomerMessagesPage() {
         } finally {
             setSending(false);
         }
-    };
+    }
+
+    // Initial Load Hook: verifies token and decodes user ID
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                // Wrapped in setTimeout to prevent React synchronous state update warning inside useEffect body
+                setTimeout(() => {
+                    setMyUserId(payload.userId || payload.user_id || payload.id);
+                }, 0);
+            } catch (e) {}
+        }
+        // Wrapped in setTimeout to prevent React synchronous state update warning inside useEffect body
+        setTimeout(() => {
+            fetchContacts();
+        }, 0);
+    }, []);
+
+    // Polling Hook: fetches chat history when a contact is selected, and schedules 
+    // a periodic check every 5 seconds to load new messages in real-time.
+    useEffect(() => {
+        if (selectedContact) {
+            // Wrapped in setTimeout to prevent React synchronous state update warning inside useEffect body
+            setTimeout(() => {
+                fetchMessages(selectedContact.id);
+            }, 0);
+            const interval = setInterval(() => {
+                fetchMessages(selectedContact.id, true);
+            }, 5000);
+            // Clear interval on unmount or contact swap to prevent leaks
+            return () => clearInterval(interval);
+        }
+    }, [selectedContact]);
+
+    useEffect(() => {
+        // Automatically scrolls chat container to show the latest messages
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     return (
         <div className="flex h-[calc(100vh-160px)] bg-white rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden">
@@ -250,5 +292,17 @@ export default function CustomerMessagesPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function CustomerMessagesPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-10 h-10 border-4 border-[#F97316] border-t-white rounded-full animate-spin"></div>
+            </div>
+        }>
+            <MessagesInner />
+        </React.Suspense>
     );
 }

@@ -533,10 +533,6 @@ function AccountSection({ showAlert }) {
   }, []);
 
   const handleRequestDeletion = async () => {
-    if (!reason.trim()) {
-      setModalError("Please share your feedback before proceeding.");
-      return;
-    }
     setModalError("");
 
     setIsDeleting(true);

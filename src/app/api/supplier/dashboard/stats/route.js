@@ -25,6 +25,9 @@ async function getSupplierId(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/supplier/dashboard/stats/route.js
+// ==========================================
 export async function GET(request) {
     const supplierId = await getSupplierId(request);
     if (!supplierId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

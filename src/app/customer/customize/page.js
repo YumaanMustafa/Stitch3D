@@ -27,7 +27,7 @@ const MATERIALS = [
     { id: 'goatskin', name: 'Rugged Goatskin', price: 4500, desc: 'Pebbled texture' }
 ];
 
-const SIZES = ['Small', 'Medium', 'Large', 'X-Large'];
+const SIZES = ['S', 'M', 'L', 'XL', 'Custom'];
 
 const VIEWS = [
     { id: 'front', label: 'Front View' },
@@ -42,6 +42,10 @@ const ACCESSORIES = [
     { id: 'patch_collar', name: 'Collar Patch', src: '/assets/accessories/patch_collar.png' }
 ];
 
+function generateCartItemId() {
+    return Date.now();
+}
+
 function CustomizerContent() {
     const canvasRef = useRef(null);
     const fCanvas = useRef(null);
@@ -53,6 +57,7 @@ function CustomizerContent() {
     const [color, setColor] = useState('black');
     const [material, setMaterial] = useState(MATERIALS[0]);
     const [size, setSize] = useState('');
+    const [customMeasurements, setCustomMeasurements] = useState({ chest: '', waist: '', sleeve: '' });
     const [vendorId, setVendorId] = useState(null);
     const [availableVendors, setAvailableVendors] = useState([]);
     const [activeDropdown, setActiveDropdown] = useState(null); // 'artisan' or null
@@ -103,6 +108,74 @@ function CustomizerContent() {
     const showAlert = (title, message, type = "success") => {
         setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
     };
+
+    function loadDesign(design) {
+        if (!fCanvas.current) return;
+
+        // Block side effects
+        isRestoring.current = true;
+
+        // 1. Restore Color
+        setColor(design.color);
+        // Restore Material if exists
+        const restoredMaterial = MATERIALS.find(m => m.id === design.material || m.name === design.material) || MATERIALS[0];
+        setMaterial(restoredMaterial);
+
+        // Restore Size if exists
+        if (design.size && design.size.startsWith('Custom')) {
+            setSize('Custom');
+            try {
+                const match = design.size.match(/Chest:\s*([\d.]+)"?,\s*Waist:\s*([\d.]+)"?,\s*Sleeve:\s*([\d.]+)"?/);
+                if (match) {
+                    setCustomMeasurements({
+                        chest: match[1],
+                        waist: match[2],
+                        sleeve: match[3]
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to parse size measurements", e);
+            }
+        } else {
+            setSize(design.size || 'M');
+        }
+
+        // Restore Vendor if exists
+        if (design.vendor_id) setVendorId(design.vendor_id);
+
+        // 2. Deep clone views
+        try {
+            console.log("Debug: Loading Design Views", design.views);
+            viewState.current = JSON.parse(JSON.stringify(design.views));
+        } catch (e) {
+            console.error("Failed to clone views", e);
+            viewState.current = { front: null, back: null, left: null, right: null };
+        }
+
+        // 3. Reset Interface to Front
+        // We manually handle the view switch to ensure clean state
+        setView('front');
+        previousView.current = 'front'; // Sync tracker
+
+        // 4. Force load 'front'
+        fCanvas.current.clear();
+        fCanvas.current.backgroundColor = null;
+
+        const frontState = viewState.current['front'];
+        if (frontState) {
+            console.log("Debug: Restoring Front View State");
+            fCanvas.current.loadFromJSON(frontState, () => {
+                fCanvas.current.renderAll();
+                console.log("Design loaded successfully - Objects count:", fCanvas.current.getObjects().length);
+                isRestoring.current = false; // Re-enable persistence
+                setHasUnsavedChanges(false); // Clean state
+            });
+        } else {
+            console.warn("Debug: No Front View State found");
+            isRestoring.current = false;
+            setHasUnsavedChanges(false);
+        }
+    }
 
     // Load Saved Designs & Custom Uploads on Mount
     // Helper to get User ID
@@ -283,10 +356,13 @@ function CustomizerContent() {
         reader.readAsDataURL(file);
     };
 
-    // 1. Load Fabric.js
+    // 1. Programmatic Fabric.js CDN loader: injects the Fabric.js script tag dynamically
+    // into the page body if it has not already been loaded into the window object
     useEffect(() => {
         if (window.fabric) {
-            setFabricLoaded(true);
+            setTimeout(() => {
+                setFabricLoaded(true);
+            }, 0);
             return;
         }
         const script = document.createElement('script');
@@ -296,7 +372,8 @@ function CustomizerContent() {
         document.body.appendChild(script);
     }, []);
 
-    // 2. Initialize Canvas
+    // 2. Fabric.js Canvas instantiation: hooks the drawing context onto the 800x900 canvas ref
+    // with transparent backgrounds and object stacking layering controls enabled
     useEffect(() => {
         if (fabricLoaded && canvasRef.current && !fCanvas.current) {
             // @ts-ignore
@@ -310,19 +387,16 @@ function CustomizerContent() {
         }
     }, [fabricLoaded]);
 
-    // 3. Persistence Logic: Save previous view, Load new view
+    // 3. Multi-View State Persistence: Saves current perspective's overlay patch coordinates (JSON)
+    // to viewState.current, clears the current canvas, and prepares to load the newly selected perspective
     useEffect(() => {
         if (!fCanvas.current || isRestoring.current) return;
 
-        // Save current state to the PREVIOUS view
-        // We carefully only save if we have a valid canvas state, to avoid overwriting with empty on init
+        // Save current canvas patches to previous view before switching sides
         const json = fCanvas.current.toJSON();
-
-        // Dirty check: simplistic - if view changes, we assume an edit might have happened or will happen
-        // Ideally we track object added/modified events on canvas
         viewState.current[previousView.current] = json;
 
-        // Clear for new view
+        // Clear canvas objects for the upcoming perspective view
         fCanvas.current.clear();
         fCanvas.current.backgroundColor = null;
 
@@ -439,6 +513,9 @@ function CustomizerContent() {
         return jacketImage || `/assets/leather/${color}_${view}.png`;
     };
 
+    // ==========================================
+    // ADD ACCESSORY: Places a design addon/accessory onto the Fabric.js canvas
+    // ==========================================
     const addAccessory = (acc) => {
         if (!fCanvas.current || !window.fabric || isPreviewOpen) return;
         setHasUnsavedChanges(true);
@@ -472,9 +549,10 @@ function CustomizerContent() {
     const clearAll = () => {
         if (!fCanvas.current || isPreviewOpen) return;
         setHasUnsavedChanges(true);
-        fCanvas.current.clear();
-        fCanvas.current.backgroundColor = null;
-        viewState.current[view] = null; // Clear saved state for this view
+        const objects = [...fCanvas.current.getObjects()];
+        objects.forEach(obj => fCanvas.current.remove(obj));
+        fCanvas.current.renderAll();
+        viewState.current[view] = fCanvas.current.toJSON();
     };
 
     // Keyboard Listener
@@ -515,14 +593,17 @@ function CustomizerContent() {
             itemName = currentDesignInState.name;
         }
 
-        const cartItemId = Date.now();
+        const cartItemId = generateCartItemId();
+        const finalSize = size === 'Custom'
+            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+            : size;
         const design = {
             id: cartItemId, // Session-specific ID for Cart (Context handles Uniqueness fallback)
             designId: designId, // Link to Database Design ID
             title: itemName,
             color: JACKET_COLORS[color].name,
             material: material.name,
-            size: size,
+            size: finalSize,
             vendorId: vendorId, // NEW: Assign specific vendor
             price: 22500 + material.price,
             img: getJacketImage(),
@@ -541,57 +622,7 @@ function CustomizerContent() {
         }, 500);
     };
 
-    const loadDesign = (design) => {
-        if (!fCanvas.current) return;
 
-        // Block side effects
-        isRestoring.current = true;
-
-        // 1. Restore Color
-        setColor(design.color);
-        // Restore Material if exists
-        const restoredMaterial = MATERIALS.find(m => m.id === design.material || m.name === design.material) || MATERIALS[0];
-        setMaterial(restoredMaterial);
-
-        // Restore Size if exists
-        setSize(design.size || 'M');
-
-        // Restore Vendor if exists
-        if (design.vendor_id) setVendorId(design.vendor_id);
-
-        // 2. Deep clone views
-        try {
-            console.log("Debug: Loading Design Views", design.views);
-            viewState.current = JSON.parse(JSON.stringify(design.views));
-        } catch (e) {
-            console.error("Failed to clone views", e);
-            viewState.current = { front: null, back: null, left: null, right: null };
-        }
-
-        // 3. Reset Interface to Front
-        // We manually handle the view switch to ensure clean state
-        setView('front');
-        previousView.current = 'front'; // Sync tracker
-
-        // 4. Force load 'front'
-        fCanvas.current.clear();
-        fCanvas.current.backgroundColor = null;
-
-        const frontState = viewState.current['front'];
-        if (frontState) {
-            console.log("Debug: Restoring Front View State");
-            fCanvas.current.loadFromJSON(frontState, () => {
-                fCanvas.current.renderAll();
-                console.log("Design loaded successfully - Objects count:", fCanvas.current.getObjects().length);
-                isRestoring.current = false; // Re-enable persistence
-                setHasUnsavedChanges(false); // Clean state
-            });
-        } else {
-            console.warn("Debug: No Front View State found");
-            isRestoring.current = false;
-            setHasUnsavedChanges(false);
-        }
-    };
 
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isSaveRequiredModalOpen, setIsSaveRequiredModalOpen] = useState(false); // New Requirement
@@ -699,18 +730,24 @@ function CustomizerContent() {
         return snapshots;
     };
 
+    // ==========================================
+    // SAVE DESIGN: Generates snapshots and posts the custom design configuration to the API
+    // ==========================================
     const executeSave = async (finalId, finalName) => {
         setIsSaveModalOpen(false);
         showToast("Generating high-res snapshots...");
 
         const snapshots = await generateSnapshots(color, viewState.current);
 
+        const finalSize = size === 'Custom'
+            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+            : size;
         const savedDesign = {
             id: finalId,
             name: finalName || 'Custom Jacket',
             color: color,
             material: material.id,
-            size: size,
+            size: finalSize,
             vendorId: vendorId,
             views: viewState.current,
             snapshots: snapshots,
@@ -743,6 +780,9 @@ function CustomizerContent() {
                     // NEW: SYNC WITH CART
                     // NEW: SYNC WITH CART VIA CONTEXT (Real-time)
                     try {
+                        const syncFinalSize = size === 'Custom'
+                            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+                            : size;
                         const productUpdate = {
                             designId: data.design.id,
                             title: data.design.name,
@@ -750,7 +790,7 @@ function CustomizerContent() {
                             // Ensure material is string name if needed, or object. 
                             // CartContext expects consistent shape. Let's pass the computed values.
                             material: material.name,
-                            size: size,
+                            size: syncFinalSize,
                             price: 22500 + material.price,
                             img: getJacketImage()
                         };
@@ -939,6 +979,50 @@ function CustomizerContent() {
                                         )}
                                     </AnimatePresence>
                                 </div>
+
+                                {/* Selected Vendor Info Panel (Option C) */}
+                                <AnimatePresence>
+                                    {(() => {
+                                        const selectedVendor = availableVendors.find(v => v.vendor_id === vendorId);
+                                        if (!selectedVendor || (!selectedVendor.specialization && !selectedVendor.shop_address)) return null;
+                                        return (
+                                            <motion.div
+                                                key={vendorId}
+                                                initial={{ opacity: 0, y: -6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -6 }}
+                                                transition={{ duration: 0.2 }}
+                                                className={`mt-3 p-4 rounded-[20px] border transition-colors duration-700 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-black/[0.03] border-black/5'}`}
+                                            >
+                                                <p className={`text-[8px] font-black uppercase tracking-[0.2em] mb-3 transition-colors duration-700 ${theme === 'dark' ? 'text-white/30' : 'text-neutral-400'}`}>Selected Artisan Details</p>
+                                                <div className="flex flex-col gap-2">
+                                                    {selectedVendor.specialization && (
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-5 h-5 rounded-lg bg-[#ff6b00]/10 flex items-center justify-center shrink-0">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-[#ff6b00]" />
+                                                            </div>
+                                                            <div>
+                                                                <p className={`text-[8px] font-black uppercase tracking-widest transition-colors duration-700 ${theme === 'dark' ? 'text-white/30' : 'text-neutral-400'}`}>Specialization</p>
+                                                                <p className={`text-[11px] font-bold transition-colors duration-700 ${theme === 'dark' ? 'text-white' : 'text-neutral-900'}`}>{selectedVendor.specialization}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {selectedVendor.shop_address && (
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+                                                                <div className={`w-1.5 h-1.5 rounded-full ${theme === 'dark' ? 'bg-white/40' : 'bg-neutral-400'}`} />
+                                                            </div>
+                                                            <div>
+                                                                <p className={`text-[8px] font-black uppercase tracking-widest transition-colors duration-700 ${theme === 'dark' ? 'text-white/30' : 'text-neutral-400'}`}>Shop Address</p>
+                                                                <p className={`text-[11px] font-bold transition-colors duration-700 ${theme === 'dark' ? 'text-white' : 'text-neutral-900'}`}>{selectedVendor.shop_address}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })()}
+                                </AnimatePresence>
                             </section>
 
                             {/* Step 2: Material */}
@@ -982,9 +1066,68 @@ function CustomizerContent() {
                                         {size || <span className="text-red-500 font-black">Required</span>}
                                     </span>
                                 </div>
-                                <div className={`grid grid-cols-4 gap-2 p-1.5 rounded-2xl transition-colors duration-700 mb-3 ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'}`}>
-                                    {SIZES.map(s => <button key={s} onClick={() => { setSize(s); setHasUnsavedChanges(true); }} className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${size === s ? 'bg-[#ff6b00] text-white shadow-[0_10px_20px_rgba(255,107,0,0.3)] scale-105' : (theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-500 hover:text-neutral-900')}`}>{s.charAt(0)}</button>)}
+                                <div className="flex gap-2 p-1 rounded-2xl bg-black/5 dark:bg-white/5 mb-3">
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            if (size === 'Custom' || (size && size.startsWith('Custom'))) {
+                                                setSize('M'); // default predefined size when toggled back
+                                            }
+                                        }} 
+                                        className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${!(size === 'Custom' || (size && size.startsWith('Custom'))) ? 'bg-[#ff6b00] text-white shadow-md' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}
+                                    >
+                                        Predefined Size
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setSize('Custom');
+                                            setHasUnsavedChanges(true);
+                                        }} 
+                                        className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${(size === 'Custom' || (size && size.startsWith('Custom'))) ? 'bg-[#ff6b00] text-white shadow-md' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}
+                                    >
+                                        Custom Size
+                                    </button>
                                 </div>
+
+                                {!(size === 'Custom' || (size && size.startsWith('Custom'))) ? (
+                                    <div className={`grid grid-cols-4 gap-2 p-1.5 rounded-2xl transition-colors duration-700 mb-3 ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'}`}>
+                                        {['S', 'M', 'L', 'XL'].map(s => (
+                                            <button 
+                                                key={s} 
+                                                onClick={() => { setSize(s); setHasUnsavedChanges(true); }} 
+                                                className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${size === s ? 'bg-[#ff6b00] text-white shadow-[0_10px_20px_rgba(255,107,0,0.3)] scale-105' : (theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-500 hover:text-neutral-900')}`}
+                                            >
+                                                {s}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className={`rounded-2xl border p-4 transition-colors duration-700 mb-3 ${theme === 'dark' ? 'border-white/10 bg-white/5' : 'border-slate-100 bg-slate-50'}`}>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                ['chest', 'Chest'],
+                                                ['waist', 'Waist'],
+                                                ['sleeve', 'Sleeve']
+                                            ].map(([key, label]) => (
+                                                <div key={key}>
+                                                    <label className="block text-[8px] font-black uppercase tracking-widest mb-1 text-slate-500 dark:text-neutral-400">{label}</label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder='e.g. 38'
+                                                        value={customMeasurements[key] || ''}
+                                                        onChange={(e) => {
+                                                            setCustomMeasurements(prev => ({ ...prev, [key]: e.target.value }));
+                                                            setHasUnsavedChanges(true);
+                                                        }}
+                                                        className="w-full px-2 py-2 rounded-xl text-xs font-bold border outline-none bg-white dark:bg-[#0f0f0f] border-slate-200 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-neutral-600 focus:border-[#ff6b00] focus:ring-1 focus:ring-[#ff6b00]"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <button
                                     onClick={() => setActiveModal('size')}
                                     className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === 'dark' ? 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10' : 'border-black/5 bg-black/5 text-slate-500 hover:bg-black/10'}`}
@@ -1246,7 +1389,7 @@ function CustomizerContent() {
                                         <AlertCircle size={32} />
                                     </div>
                                     <h3 className={`text-xl font-black mb-2 transition-colors duration-700 ${theme === 'dark' ? 'text-white' : 'text-neutral-900'}`}>Overwrite?</h3>
-                                    <p className="text-neutral-500 text-sm mb-8">A design named "{saveName}" already exists. Do you want to replace it?</p>
+                                    <p className="text-neutral-500 text-sm mb-8">A design named &quot;{saveName}&quot; already exists. Do you want to replace it?</p>
                                     <div className="flex gap-4">
                                         <button onClick={() => setShowOverwriteConfirmation(false)} className={`flex-1 py-4 font-bold transition-colors ${theme === 'dark' ? 'text-neutral-400 hover:text-white' : 'text-neutral-400 hover:text-neutral-900'}`}>Go Back</button>
                                         <button onClick={confirmOverwrite} className="flex-1 py-4 bg-red-500 rounded-2xl text-white font-black hover:bg-red-600 transition-all shadow-xl shadow-red-500/20">Overwrite</button>
@@ -1295,13 +1438,20 @@ function CustomizerContent() {
                                                     {['S', 'M', 'L', 'XL'].map((sz, i) => (
                                                         <tr key={sz} className={`transition-colors ${theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-slate-50/50'}`}>
                                                             <td className="p-4 font-bold">{sz}</td>
-                                                            <td className="p-4 text-sm opacity-80">{36 + i * 2}" - {38 + i * 2}"</td>
-                                                            <td className="p-4 text-sm opacity-80">{30 + i * 2}" - {32 + i * 2}"</td>
-                                                            <td className="p-4 text-sm opacity-80">{33 + i * 0.5}"</td>
+                                                            <td className="p-4 text-sm opacity-80">{36 + i * 2}&quot; - {38 + i * 2}&quot;</td>
+                                                            <td className="p-4 text-sm opacity-80">{30 + i * 2}&quot; - {32 + i * 2}&quot;</td>
+                                                            <td className="p-4 text-sm opacity-80">{33 + i * 0.5}&quot;</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
                                             </table>
+                                            {/* Custom Size Info Card (Unclickable) */}
+                                            <div className={`rounded-2xl border p-5 transition-colors duration-700 ${theme === 'dark' ? 'border-white/10 bg-white/5' : 'border-slate-100 bg-slate-50'}`}>
+                                                <h4 className={`text-xs font-black uppercase tracking-widest mb-2 ${theme === 'dark' ? 'text-white/80' : 'text-slate-700'}`}>Need a Custom Fit?</h4>
+                                                <p className={`text-[11px] leading-relaxed transition-colors duration-700 ${theme === 'dark' ? 'text-neutral-400' : 'text-slate-600'}`}>
+                                                    Custom sizing cannot be configured from this chart. Please close this modal, select the <strong className="text-[#ff6b00]">Custom Size</strong> option directly in the studio sidebar, and enter your chest, waist, and sleeve measurements there.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -1425,7 +1575,7 @@ function CustomizerContent() {
                                                     <span className="text-[9px] opacity-40 font-bold uppercase">Resilient</span>
                                                 </div>
                                                 <p className="text-[11px] opacity-70 leading-relaxed">
-                                                    Naturally water-resistant with a unique pebbled texture. It's incredibly strong yet surprisingly light and flexible.
+                                                    Naturally water-resistant with a unique pebbled texture. It&apos;s incredibly strong yet surprisingly light and flexible.
                                                 </p>
                                             </div>
                                         </div>
@@ -1446,7 +1596,7 @@ function CustomizerContent() {
                                                     <h5 className="font-black text-[10px] uppercase tracking-widest text-[#ff6b00]">Design Viewer</h5>
                                                 </div>
                                                 <p className="text-[10px] opacity-70 leading-relaxed">
-                                                    Click 'View Design' to see your creation in a high-fidelity preview.
+                                                    Click &apos;View Design&apos; to see your creation in a high-fidelity preview.
                                                 </p>
                                             </div>
                                         </div>
@@ -1472,7 +1622,7 @@ function CustomizerContent() {
                                             onClick={() => setIsGuideMinimized(true)}
                                             className="flex-1 py-4 bg-[#ff6b00] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-3"
                                         >
-                                            Let's Design Studio <ChevronRight size={16} />
+                                            Let&apos;s Design Studio <ChevronRight size={16} />
                                         </button>
                                     </div>
                                 </motion.div>

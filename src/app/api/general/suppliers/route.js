@@ -6,6 +6,9 @@ import db from '@/lib/db';
  * @description General API to fetch active suppliers for the vendor's material request form.
  */
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/general/suppliers/route.js
+// ==========================================
 export async function GET() {
     try {
         const [suppliers] = await db.query(`

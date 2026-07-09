@@ -9,6 +9,9 @@ import { NextResponse } from "next/server";
  * Generates a reset token (OTP) and sends it to the user's email.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/forgot-password/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const { email } = await req.json();

@@ -68,17 +68,17 @@ async function run() {
       ) ENGINE=InnoDB;
     `);
 
-    // vendors (note: code expects column named `password`)
+    // vendors (note: normalized, email/password are in users table)
     try {
       await db.query(`
         CREATE TABLE IF NOT EXISTS vendors (
           vendor_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
           user_id INT,
           name VARCHAR(255),
-          email VARCHAR(255),
-          password VARCHAR(255),
           company_name VARCHAR(255),
           phone_number VARCHAR(50),
+          shop_address TEXT,
+          specialization VARCHAR(100),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB;
@@ -90,9 +90,10 @@ async function run() {
           vendor_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
           user_id INT,
           name VARCHAR(255),
-          email VARCHAR(255),
-          password VARCHAR(255),
           company_name VARCHAR(255),
+          phone_number VARCHAR(50),
+          shop_address TEXT,
+          specialization VARCHAR(100),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB;
       `);
@@ -275,6 +276,10 @@ async function run() {
     try { await db.query('ALTER TABLE users ADD COLUMN deletion_reason VARCHAR(255) DEFAULT NULL;'); } catch (e) { }
     try { await db.query('ALTER TABLE vendor_products ADD COLUMN average_rating DECIMAL(3,2) DEFAULT 0.00;'); } catch (e) { }
     try { await db.query('ALTER TABLE vendor_products ADD COLUMN total_reviews INT DEFAULT 0;'); } catch (e) { }
+    try { await db.query('ALTER TABLE vendors ADD COLUMN shop_address TEXT;'); } catch (e) { }
+    try { await db.query('ALTER TABLE vendors ADD COLUMN specialization VARCHAR(100);'); } catch (e) { }
+    try { await db.query('ALTER TABLE vendors DROP COLUMN email;'); } catch (e) { }
+    try { await db.query('ALTER TABLE vendors DROP COLUMN password;'); } catch (e) { }
 
     // custom_uploads (For persistent user patches)
     await db.query(`
@@ -444,52 +449,70 @@ async function run() {
     // Patch for existing supplier_inventory table
     try { await db.query('ALTER TABLE supplier_inventory ADD COLUMN size VARCHAR(255) AFTER type;'); } catch (e) { }
 
-    // --- Seed a default admin if none exists ---
+    // --- Seed Users & Roles ---
+    const defaultPassword = "password123";
+    const password_hash = await bcrypt.hash(defaultPassword, 10);
+
+    const testUsers = [
+      { role: "customer", first: "Alice", last: "Customer", email: "alice.cust@test.com" },
+      { role: "customer", first: "Bob", last: "Customer", email: "bob.cust@test.com" },
+      { role: "vendor", first: "Charlie", last: "Vendor", email: "charlie.vend@test.com" },
+      { role: "vendor", first: "Dave", last: "Vendor", email: "dave.vend@test.com" },
+      { role: "supplier", first: "Eve", last: "Supplier", email: "eve.supp@test.com" },
+      { role: "supplier", first: "Frank", last: "Supplier", email: "frank.supp@test.com" },
+    ];
+
+    // Seed default admin in admins table
     const defaultAdminEmail = process.env.ADMIN_EMAIL || "admin@stitch.local";
     const defaultAdminPass = process.env.ADMIN_PASS || "admin123";
     const [existingAdmin] = await db.query("SELECT admin_id FROM admins WHERE email = ?", [defaultAdminEmail]);
     if (!existingAdmin.length) {
-      const hashed = await bcrypt.hash(defaultAdminPass, 10);
-      await db.query("INSERT INTO admins (email, password, name, created_at) VALUES (?, ?, ?, NOW())", [defaultAdminEmail, hashed, "Local Admin"]);
-      console.log(`✅ Seeded admin: ${defaultAdminEmail} (password from ADMIN_PASS or 'admin123')`);
+      const adminHashed = await bcrypt.hash(defaultAdminPass, 10);
+      await db.query("INSERT INTO admins (email, password, name, created_at) VALUES (?, ?, ?, NOW())", [defaultAdminEmail, adminHashed, "Local Admin"]);
+      console.log(`✅ Seeded admin: ${defaultAdminEmail}`);
     } else {
       console.log("ℹ️ Admin user already exists, skipping admin seed.");
     }
 
-    // --- Seed a sample vendor if none exists ---
+    // Seed default vendor
     const sampleVendorEmail = process.env.SAMPLE_VENDOR_EMAIL || "vendor@stitch.local";
     const sampleVendorPass = process.env.SAMPLE_VENDOR_PASS || "vendor123";
-    const [existingVendor] = await db.query("SELECT vendor_id FROM vendors WHERE email = ?", [sampleVendorEmail]);
+    const [existingVendor] = await db.query(
+      "SELECT v.vendor_id FROM vendors v JOIN users u ON v.user_id = u.user_id WHERE u.email = ?",
+      [sampleVendorEmail]
+    );
+    let sampleVendorId = existingVendor[0]?.vendor_id;
     if (!existingVendor.length) {
       const hashedVendor = await bcrypt.hash(sampleVendorPass, 10);
-      const [vResult] = await db.query("INSERT INTO vendors (name, email, password, company_name, created_at) VALUES (?, ?, ?, ?, NOW())", [
-        "Sample Vendor",
-        sampleVendorEmail,
-        hashedVendor,
-        "Sample Co",
-      ]);
-      console.log(`✅ Seeded sample vendor: ${sampleVendorEmail} (password from SAMPLE_VENDOR_PASS or 'vendor123')`);
-
-      // Create a corresponding `users` row for vendor login via /api/auth/login
+      
+      // 1. Ensure the user exists first
       const [existingUser] = await db.query("SELECT user_id FROM users WHERE email = ?", [sampleVendorEmail]);
+      let userId;
       if (!existingUser.length) {
         const [uResult] = await db.query(
           `INSERT INTO users (first_name, last_name, email, password_hash, role, status, created_at)
            VALUES (?, ?, ?, ?, 'vendor', 'active', NOW())`,
           ["Sample", "Vendor", sampleVendorEmail, hashedVendor]
         );
-        const userId = uResult.insertId;
-        await db.query("UPDATE vendors SET user_id = ? WHERE vendor_id = ?", [userId, vResult.insertId]);
-        console.log(`✅ Created linked users.user_id=${userId} and updated vendors.user_id`);
+        userId = uResult.insertId;
+        console.log(`✅ Created users.user_id=${userId}`);
       } else {
-        // if a user exists, link it
-        await db.query("UPDATE vendors SET user_id = ? WHERE vendor_id = ?", [existingUser[0].user_id, vResult.insertId]);
-        console.log(`✅ Linked existing users.user_id=${existingUser[0].user_id} to vendor`);
+        userId = existingUser[0].user_id;
       }
+
+      // 2. Create the vendor record linked to the user
+      const [vResult] = await db.query(
+        "INSERT INTO vendors (user_id, name, company_name, phone_number, shop_address, specialization, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+        [userId, "Sample Vendor", "Sample Co", "1234567890", "123 Main St", "Varsity"]
+      );
+      sampleVendorId = vResult.insertId;
+      console.log(`✅ Seeded sample vendor linked to ${sampleVendorEmail}`);
     } else {
       console.log("ℹ️ Sample vendor already exists, checking for user link...");
-      // ensure vendors.user_id is linked to a users row
-      const [[vendorRow]] = await db.query("SELECT vendor_id, user_id FROM vendors WHERE email = ?", [sampleVendorEmail]);
+      const [[vendorRow]] = await db.query(
+        "SELECT v.vendor_id, v.user_id FROM vendors v JOIN users u ON v.user_id = u.user_id WHERE u.email = ?",
+        [sampleVendorEmail]
+      );
       if (vendorRow && !vendorRow.user_id) {
         const [existingUser] = await db.query("SELECT user_id FROM users WHERE email = ?", [sampleVendorEmail]);
         if (!existingUser.length) {
@@ -500,47 +523,118 @@ async function run() {
             ["Sample", "Vendor", sampleVendorEmail, hashedVendor]
           );
           await db.query("UPDATE vendors SET user_id = ? WHERE vendor_id = ?", [uResult.insertId, vendorRow.vendor_id]);
-          console.log(`✅ Created and linked users.user_id=${uResult.insertId} to existing vendor`);
         } else {
           await db.query("UPDATE vendors SET user_id = ? WHERE vendor_id = ?", [existingUser[0].user_id, vendorRow.vendor_id]);
-          console.log(`✅ Linked existing users.user_id=${existingUser[0].user_id} to existing vendor`);
         }
+      }
+    }
+
+    // Seed test users (Alice, Bob, Charlie, Dave, Eve, Frank)
+    for (const user of testUsers) {
+      const [existing] = await db.query("SELECT user_id FROM users WHERE email = ?", [user.email]);
+      let userId;
+      if (existing.length === 0) {
+        const [result] = await db.query(
+          "INSERT INTO users (first_name, last_name, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?, 'active')",
+          [user.first, user.last, user.email, password_hash, user.role]
+        );
+        userId = result.insertId;
+        console.log(`✅ Seeded user: ${user.email}`);
       } else {
-        console.log("ℹ️ Existing vendor already linked to a user.");
+        userId = existing[0].user_id;
+        console.log(`ℹ️ User ${user.email} already exists.`);
+      }
+
+      // Check / Insert into specific role table
+      if (user.role === "customer") {
+        const [existCust] = await db.query("SELECT customer_id FROM customers WHERE user_id = ?", [userId]);
+        if (!existCust.length) {
+          await db.query(
+            "INSERT INTO customers (user_id, phone_number, address, city, country) VALUES (?, ?, ?, ?, ?)",
+            [userId, "1234567890", "123 Customer St", "Test City", "Test Country"]
+          );
+        }
+      } else if (user.role === "vendor") {
+        const [existVend] = await db.query("SELECT vendor_id FROM vendors WHERE user_id = ?", [userId]);
+        if (!existVend.length) {
+          await db.query(
+            "INSERT INTO vendors (user_id, name, email, password, company_name) VALUES (?, ?, ?, ?, ?)",
+            [userId, `${user.first} ${user.last}`, user.email, password_hash, `${user.first} Workshop`]
+          );
+        }
+      } else if (user.role === "supplier") {
+        const [existSupp] = await db.query("SELECT supplier_id FROM suppliers WHERE user_id = ?", [userId]);
+        if (!existSupp.length) {
+          await db.query(
+            "INSERT INTO suppliers (user_id, approved, business_registration_number, phone, address) VALUES (?, 1, ?, ?, ?)",
+            [userId, `BRN-${userId}000`, "0987654321", "123 Supplier Ave"]
+          );
+        }
       }
     }
 
-    // --- Seed Sample Products (Dynamic Gap Fill) ---
-    const [existingProducts] = await db.query("SELECT COUNT(*) as count FROM vendor_products");
-    if (existingProducts[0].count < 5) {
-      console.log("ℹ️ Seeding initial products...");
-      const sampleProducts = [
-        { name: "Classic Biker Jacket", price: 22000.00, stock: 15, category: "Biker", image: "https://images.unsplash.com/photo-1551028919-383718eccf3f?auto=format&fit=crop&q=80&w=800" },
-        { name: "Midnight Bomber", price: 18500.00, stock: 8, category: "Bomber", image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=800" },
-        { name: "Vintage Racer", price: 26000.00, stock: 3, category: "Racer", image: "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&q=80&w=800" },
-        { name: "Heritage Aviator", price: 32000.00, stock: 12, category: "Aviator", image: "https://images.unsplash.com/photo-1520975954732-35dd22299614?auto=format&fit=crop&q=80&w=800" },
-        { name: "Urban Stealth", price: 21000.00, stock: 20, category: "Motocross", image: "https://images.unsplash.com/photo-1559551409-dadc959f76b8?auto=format&fit=crop&q=80&w=800" },
-        { name: "Crimson Rider", price: 24000.00, stock: 6, category: "Biker", image: "https://images.unsplash.com/photo-1515347619252-60a6bf4fffce?auto=format&fit=crop&q=80&w=800" },
-        { name: "Distressed Field Jacket", price: 19500.00, stock: 10, category: "Field", image: "https://images.unsplash.com/photo-1504198458649-3128b932f49e?auto=format&fit=crop&q=80&w=800" },
-        { name: "Suede Cafe Racer", price: 28000.00, stock: 4, category: "Racer", image: "https://images.unsplash.com/photo-1506152983158-b4a74a01c721?auto=format&fit=crop&q=80&w=800" }
-      ];
+    // --- Seed Vendor Products ---
+    // Products for sample vendor (vendor@stitch.local)
+    if (sampleVendorId) {
+      const [existingSampleProd] = await db.query("SELECT COUNT(*) as count FROM vendor_products WHERE vendor_id = ?", [sampleVendorId]);
+      if (existingSampleProd[0].count === 0) {
+        const sampleProducts = [
+          { name: "Classic Biker Jacket", price: 22000.00, stock: 15, category: "Biker", image: "https://images.unsplash.com/photo-1551028919-383718eccf3f?auto=format&fit=crop&q=80&w=800" },
+          { name: "Midnight Bomber", price: 18500.00, stock: 8, category: "Bomber", image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=800" },
+          { name: "Vintage Racer", price: 26000.00, stock: 3, category: "Racer", image: "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&q=80&w=800" },
+          { name: "Heritage Aviator", price: 32000.00, stock: 12, category: "Aviator", image: "https://images.unsplash.com/photo-1520975954732-35dd22299614?auto=format&fit=crop&q=80&w=800" },
+          { name: "Urban Stealth", price: 21000.00, stock: 20, category: "Motocross", image: "https://images.unsplash.com/photo-1559551409-dadc959f76b8?auto=format&fit=crop&q=80&w=800" },
+          { name: "Crimson Rider", price: 24000.00, stock: 6, category: "Biker", image: "https://images.unsplash.com/photo-1515347619252-60a6bf4fffce?auto=format&fit=crop&q=80&w=800" },
+          { name: "Distressed Field Jacket", price: 19500.00, stock: 10, category: "Field", image: "https://images.unsplash.com/photo-1504198458649-3128b932f49e?auto=format&fit=crop&q=80&w=800" },
+          { name: "Suede Cafe Racer", price: 28000.00, stock: 4, category: "Racer", image: "https://images.unsplash.com/photo-1506152983158-b4a74a01c721?auto=format&fit=crop&q=80&w=800" }
+        ];
+        for (const p of sampleProducts) {
+          await db.query(`
+            INSERT INTO vendor_products (vendor_id, name, price, stock, category, image, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'Active')
+          `, [sampleVendorId, p.name, p.price, p.stock, p.category, p.image]);
+        }
+        console.log(`✅ Seeded ${sampleProducts.length} products for sample vendor.`);
+      }
+    }
 
-      // Get sample vendor ID
-      const [[sVendor]] = await db.query("SELECT vendor_id FROM vendors WHERE email = ?", [sampleVendorEmail]);
-      const vId = sVendor ? sVendor.vendor_id : null;
-
-      for (const p of sampleProducts) {
+    // Products for Charlie Vendor (charlie.vend@test.com)
+    const [charlieVendor] = await db.query(
+      "SELECT v.vendor_id FROM vendors v JOIN users u ON v.user_id = u.user_id WHERE u.email = 'charlie.vend@test.com'"
+    );
+    if (charlieVendor.length > 0) {
+      const charlieId = charlieVendor[0].vendor_id;
+      const [existingCharlieProd] = await db.query("SELECT COUNT(*) as count FROM vendor_products WHERE vendor_id = ?", [charlieId]);
+      if (existingCharlieProd[0].count === 0) {
         await db.query(`
-                INSERT INTO vendor_products (vendor_id, name, price, stock, category, image, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'Active')
-             `, [vId, p.name, p.price, p.stock, p.category, p.image]);
+          INSERT INTO vendor_products (vendor_id, name, price, stock, category, image, status)
+          VALUES 
+          (?, 'Charlie Custom Bomber Jacket', 120.00, 50, 'Bomber', 'https://images.unsplash.com/photo-1591561954557-26941169b49e', 'Active'),
+          (?, 'Charlie Denim Streetwear', 150.00, 30, 'Denim', 'https://images.unsplash.com/photo-1591561954557-26941169b49e', 'Active')
+        `, [charlieId, charlieId]);
+        console.log("✅ Seeded products for Charlie Vendor.");
       }
-      console.log(`✅ Seeded ${sampleProducts.length} sample products.`);
-    } else {
-      console.log("ℹ️ Products already exist, skipping seed.");
     }
 
-    // --- Seed Supplier Inventory for existing suppliers 1 & 2 ---
+    // Products for Dave Vendor (dave.vend@test.com)
+    const [daveVendor] = await db.query(
+      "SELECT v.vendor_id FROM vendors v JOIN users u ON v.user_id = u.user_id WHERE u.email = 'dave.vend@test.com'"
+    );
+    if (daveVendor.length > 0) {
+      const daveId = daveVendor[0].vendor_id;
+      const [existingDaveProd] = await db.query("SELECT COUNT(*) as count FROM vendor_products WHERE vendor_id = ?", [daveId]);
+      if (existingDaveProd[0].count === 0) {
+        await db.query(`
+          INSERT INTO vendor_products (vendor_id, name, price, stock, category, image, status)
+          VALUES 
+          (?, 'Dave Classic Leather Jacket', 200.00, 20, 'Leather', 'https://images.unsplash.com/photo-1551028719-00167b16eac5', 'Active'),
+          (?, 'Dave Varsity Style Jacket', 180.00, 40, 'Varsity', 'https://images.unsplash.com/photo-1551028719-00167b16eac5', 'Active')
+        `, [daveId, daveId]);
+        console.log("✅ Seeded products for Dave Vendor.");
+      }
+    }
+
+    // --- Seed Supplier Inventory for all suppliers ---
     const sampleInventoryItems = [
       { name: "Metal Buttons", type: "Accessories", size: "15mm", price: 5.00, stock: 2000, image: "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=200" },
       { name: "Heavy Duty YKK Zipper", type: "Fasteners", size: "30cm", price: 45.00, stock: 500, image: "https://images.unsplash.com/photo-1594540911438-27517c24483a?auto=format&fit=crop&q=80&w=200" },
@@ -549,7 +643,7 @@ async function run() {
       { name: "High Tenacity Thread", type: "Threads", size: "5000m spool", price: 250.00, stock: 150, image: "https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&q=80&w=200" }
     ];
 
-    const [suppliersList] = await db.query("SELECT supplier_id FROM suppliers WHERE supplier_id IN (1, 2)");
+    const [suppliersList] = await db.query("SELECT supplier_id FROM suppliers");
     for (const s of suppliersList) {
       const [existingCount] = await db.query("SELECT COUNT(*) as count FROM supplier_inventory WHERE supplier_id = ?", [s.supplier_id]);
       if (existingCount[0].count === 0) {

@@ -9,6 +9,9 @@ import jwt from 'jsonwebtoken';
  * Authenticates admin credentials (email/password) and issues a JWT token.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/admin/login/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const body = await request.json();

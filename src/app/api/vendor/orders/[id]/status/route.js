@@ -23,6 +23,9 @@ async function getVendorId(request) {
 }
 
 // PUT: Update Order Status
+// ==========================================
+// PUT HANDLER: Handles PUT requests for src/app/api/vendor/orders/[id]/status/route.js
+// ==========================================
 export async function PUT(request, { params }) {
     try {
         const vendorId = await getVendorId(request);

@@ -21,6 +21,8 @@ export default function VendorOrders() {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isDesignViewerOpen, setIsDesignViewerOpen] = useState(false);
     const [selectedDesignOrder, setSelectedDesignOrder] = useState(null);
+    const [isStandardViewerOpen, setIsStandardViewerOpen] = useState(false);
+    const [selectedStandardOrder, setSelectedStandardOrder] = useState(null);
     const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => { }, hideCancel: false });
 
     useEffect(() => {
@@ -29,7 +31,7 @@ export default function VendorOrders() {
                 const token = localStorage.getItem("vendorToken");
                 const res = await fetch("/api/vendor/orders", { headers: { Authorization: `Bearer ${token}` } });
                 if (res.ok) setOrders(await res.json());
-            } catch (err) {} finally { setLoading(false); }
+            } catch (err) { } finally { setLoading(false); }
         };
         fetchOrders();
     }, []);
@@ -55,7 +57,7 @@ export default function VendorOrders() {
                 setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o));
                 setStatusModalOpen(false);
             }
-        } catch (err) {}
+        } catch (err) { }
     };
 
     const getStatusStyle = (status) => {
@@ -72,23 +74,23 @@ export default function VendorOrders() {
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                   <h2 className="text-[10px] font-black text-[#F97316] uppercase tracking-[0.4em] mb-3">Sales</h2>
-                   <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Order List</h1>
-                   <p className="text-sm font-medium text-slate-500 mt-2">Manage customer orders and tracking status.</p>
+                    <h2 className="text-[10px] font-black text-[#F97316] uppercase tracking-[0.4em] mb-3">Sales</h2>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Order List</h1>
+                    <p className="text-sm font-medium text-slate-500 mt-2">Manage customer orders and tracking status.</p>
                 </div>
             </div>
 
             {/* Control Bar */}
             <div className="flex flex-wrap gap-4 items-center justify-between">
                 <div className="relative w-full max-w-md">
-                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                   <input
-                     type="text"
-                     placeholder="SEARCH ORDERS..."
-                     value={searchQuery}
-                     onChange={(e) => setSearchQuery(e.target.value)}
-                     className="w-full pl-14 pr-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-900 outline-none focus:border-[#F97316] transition-all"
-                   />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="SEARCH ORDERS..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-14 pr-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-900 outline-none focus:border-[#F97316] transition-all"
+                    />
                 </div>
             </div>
 
@@ -106,6 +108,7 @@ export default function VendorOrders() {
                                         <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316]">Date</th>
                                         <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316] text-right">Total</th>
                                         <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316]">Status</th>
+                                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316]">Size</th>
                                         <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316] text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -119,6 +122,11 @@ export default function VendorOrders() {
                                             <td className="px-8 py-6">
                                                 <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusStyle(order.status)}`}>
                                                     {order.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border text-indigo-600 bg-indigo-50 border-indigo-100">
+                                                    {!order.size || order.size.startsWith('Custom') ? 'C' : ({ 'Small': 'S', 'Medium': 'M', 'Large': 'L', 'X-Large': 'XL', 'S': 'S', 'M': 'M', 'L': 'L', 'XL': 'XL' })[order.size] || 'C'}
                                                 </span>
                                             </td>
                                             <td className="px-8 py-6 text-right">
@@ -153,14 +161,15 @@ export default function VendorOrders() {
                                     <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Date</th>
                                     <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 text-right">Total</th>
                                     <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Status</th>
+                                    <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Size</th>
                                     <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {loading ? (
-                                    <tr><td colSpan="6" className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 animate-pulse">Loading Orders...</td></tr>
+                                    <tr><td colSpan="7" className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 animate-pulse">Loading Orders...</td></tr>
                                 ) : standardOrders.length === 0 ? (
-                                    <tr><td colSpan="6" className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">No standard orders found</td></tr>
+                                    <tr><td colSpan="7" className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">No standard orders found</td></tr>
                                 ) : (
                                     standardOrders.map((order) => (
                                         <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -173,8 +182,18 @@ export default function VendorOrders() {
                                                     {order.status}
                                                 </span>
                                             </td>
+                                            <td className="px-8 py-6">
+                                                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                    order.size ? 'text-slate-900 bg-slate-100 border-slate-200' : 'text-slate-300 bg-slate-50 border-slate-100'
+                                                }`}>
+                                                    {order.size || '—'}
+                                                </span>
+                                            </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">
+                                                    <button onClick={() => { setSelectedStandardOrder(order); setIsStandardViewerOpen(true); }} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="View Ordered Item">
+                                                        <Eye size={18} />
+                                                    </button>
                                                     <button onClick={() => { setSelectedOrder(order); setStatusModalOpen(true); }} className="p-3 text-slate-300 hover:text-[#F97316] hover:bg-orange-50 rounded-xl transition-all" title="Update Status">
                                                         <Edit size={18} />
                                                     </button>
@@ -218,12 +237,50 @@ export default function VendorOrders() {
                 </div>
             </Modal>
 
-            <Modal isOpen={isDesignViewerOpen} onClose={() => setIsDesignViewerOpen(false)} title="Interactive Design Viewer" maxWidth="max-w-2xl">
+            <Modal isOpen={isDesignViewerOpen} onClose={() => setIsDesignViewerOpen(false)} title="Vendor Design Viewer" maxWidth="max-w-2xl">
                 {selectedDesignOrder && (
                     <div className="space-y-6 p-4">
                         <DesignViewer designId={selectedDesignOrder.design_id || selectedDesignOrder.id} />
+                        {selectedDesignOrder.size && selectedDesignOrder.size.startsWith('Custom') && (() => {
+                            const raw = selectedDesignOrder.size.replace(/^Custom\s*\(/, '').replace(/\)$/, '');
+                            const parts = raw.split(', ').map(p => p.split(': '));
+                            return (
+                                <div className="bg-orange-50/40 border border-orange-100 rounded-[1.5rem] px-6 py-4">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316] mb-3">Custom Measurements</p>
+                                    <div className="flex flex-wrap gap-6">
+                                        {parts.map(([label, value]) => (
+                                            <div key={label} className="flex flex-col">
+                                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+                                                <span className="text-sm font-black text-slate-900 tracking-tighter">{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         <div className="flex justify-end pt-4">
                             <button onClick={() => setIsDesignViewerOpen(false)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all">Close Viewer</button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <Modal isOpen={isStandardViewerOpen} onClose={() => setIsStandardViewerOpen(false)} title="Ordered Jacket Details" maxWidth="max-w-md">
+                {selectedStandardOrder && (
+                    <div className="space-y-6 p-4 text-center">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-[#F97316] mb-2">Item Name</h4>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter uppercase mb-6">{selectedStandardOrder.title}</p>
+
+                        <div className="aspect-square relative rounded-[1.5rem] bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
+                            <img
+                                src={selectedStandardOrder.image}
+                                alt={selectedStandardOrder.title}
+                                className="max-w-full max-h-full object-contain p-6 mix-blend-multiply animate-fade-in"
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <button onClick={() => setIsStandardViewerOpen(false)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all">Close</button>
                         </div>
                     </div>
                 )}

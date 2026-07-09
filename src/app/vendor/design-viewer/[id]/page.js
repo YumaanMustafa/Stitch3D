@@ -34,6 +34,8 @@ export default function VendorFullscreenViewer({ params }) {
     const containerRef = useRef(null);
     const [scale, setScale] = useState(1);
 
+    // 1. Responsive scaling logic: Calculates scale factor dynamically on window resize
+    // to fit the 800x900 canvas container inside smaller screen sizes.
     useEffect(() => {
         const updateScale = () => {
             if (containerRef.current) {
@@ -48,16 +50,18 @@ export default function VendorFullscreenViewer({ params }) {
         return () => window.removeEventListener('resize', updateScale);
     }, []);
 
-    // 1. Resolve Params
+    // 2. ROUTE PARAMS: Resolve async URL parameters (required by Next.js App Router parameters API)
     useEffect(() => {
         if (params instanceof Promise) {
             params.then(p => setResolvedParams(p));
         } else {
-            setResolvedParams(params);
+            setTimeout(() => {
+                setResolvedParams(params);
+            }, 0);
         }
     }, [params]);
 
-    // 2. Fetch Design Data
+    // 3. FETCH DATA: Load the customized design specifications from the vendor API
     useEffect(() => {
         if (!resolvedParams?.id) return;
         const fetchDesign = async () => {
@@ -79,10 +83,13 @@ export default function VendorFullscreenViewer({ params }) {
         fetchDesign();
     }, [resolvedParams]);
 
-    // 3. Load Fabric.js
+    // 4. LOAD FABRIC.JS: Programmatically inject Fabric.js library via CDN script tag
+    // if window.fabric is not already loaded/cached in the browser window
     useEffect(() => {
         if (window.fabric) {
-            setFabricLoaded(true);
+            setTimeout(() => {
+                setFabricLoaded(true);
+            }, 0);
             return;
         }
         const script = document.createElement('script');
@@ -92,7 +99,7 @@ export default function VendorFullscreenViewer({ params }) {
         document.body.appendChild(script);
     }, []);
 
-    // 4. Initialize Canvas
+    // 5. CANVAS INIT: Initialize the Fabric.js Canvas instance for overlaying patches
     useEffect(() => {
         if (fabricLoaded && canvasRef.current && !fCanvas.current && designData) {
             const fabric = window.fabric;
@@ -106,7 +113,8 @@ export default function VendorFullscreenViewer({ params }) {
         }
     }, [fabricLoaded, designData]);
 
-    // 5. Update Jacket Background Image based on view/color
+    // 6. JACKET BACKGROUND: Verify and resolve correct file format extension
+    // (PNG, JPG, WEBP) for the target perspective view and color background image
     useEffect(() => {
         if (!designData) return;
         const color = designData.color || 'black';
@@ -128,7 +136,8 @@ export default function VendorFullscreenViewer({ params }) {
         checkFormat();
     }, [view, designData]);
 
-    // 6. Load Canvas JSON for specific view
+    // 7. LOAD OVERLAYS JSON: Reconstruct the custom canvas accessories from JSON configuration.
+    // Locks all elements to prevent the vendor/artisan from editing or dragging design coordinates (read-only).
     useEffect(() => {
         if (!fCanvas.current || !designData || !designData.views) return;
 
@@ -138,7 +147,7 @@ export default function VendorFullscreenViewer({ params }) {
         const viewJson = designData.views[view];
         if (viewJson) {
             fCanvas.current.loadFromJSON(viewJson, () => {
-                // Lock all objects
+                // Iteratively lock all canvas objects for read-only view
                 fCanvas.current.forEachObject(obj => {
                     obj.selectable = false;
                     obj.evented = false;

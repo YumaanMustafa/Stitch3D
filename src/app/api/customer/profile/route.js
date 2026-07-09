@@ -26,6 +26,9 @@ async function getUserId(request) {
 /**
  * GET handler to fetch customer profile.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/customer/profile/route.js
+// ==========================================
 export async function GET(request) {
     const userId = await getUserId(request);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -41,6 +44,9 @@ export async function GET(request) {
     }
 }
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/customer/profile/route.js
+// ==========================================
 export async function POST(request) {
     const userId = await getUserId(request);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

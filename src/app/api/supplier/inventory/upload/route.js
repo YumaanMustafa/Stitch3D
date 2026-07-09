@@ -18,6 +18,9 @@ async function getSupplierFromToken(request) {
     }
 }
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/supplier/inventory/upload/route.js
+// ==========================================
 export async function POST(req) {
     try {
         const supplier = await getSupplierFromToken(req);

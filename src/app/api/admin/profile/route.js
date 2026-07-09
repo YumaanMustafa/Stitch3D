@@ -15,6 +15,9 @@ export const dynamic = 'force-dynamic';
  * GET handler to retrieve admin profile.
  * Validates the JWT token before fetching data.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/admin/profile/route.js
+// ==========================================
 export async function GET(req) {
     try {
         const adminAuth = getUserFromRequest(req);

@@ -24,15 +24,17 @@ async function getVendorId(request) {
 /**
  * GET handler to fetch vendor stats.
  */
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/vendor/dashboard/stats/route.js
+// ==========================================
 export async function GET(request) {
     const vendorId = await getVendorId(request);
     if (!vendorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const stats = {
         revenue: 0,
-        orders: 0,
-        pending: 0,
-        requests: 0,
+        activeOrders: 0,
+        totalProducts: 0,
         growth: 0,
         chart: [],
         actions: [],
@@ -40,17 +42,15 @@ export async function GET(request) {
     };
 
     try {
-        // 1. Orders Stats
+        // 1. Orders Stats (Revenue and Growth)
         try {
             const [revenueRows] = await db.query(`
                 SELECT 
-                    SUM(total) as revenue, 
-                    COUNT(*) as count 
+                    SUM(total) as revenue
                 FROM orders
                 WHERE vendor_id = ?
             `, [vendorId]);
             stats.revenue = Number(revenueRows[0].revenue || 0);
-            stats.orders = revenueRows[0].count || 0;
 
             // Mock growth based on revenue (just for visuals)
             stats.growth = stats.revenue > 0 ? 12.5 : 0;
@@ -60,7 +60,7 @@ export async function GET(request) {
             stats.errors.push("Orders: " + e.message);
         }
 
-        // 2. Pending Orders
+        // 2. Pending Orders count mapped to activeOrders
         try {
             const [pendingRows] = await db.query(`
                 SELECT COUNT(*) as count 
@@ -68,10 +68,23 @@ export async function GET(request) {
                 WHERE (status = 'Pending' OR status = 'Processing' OR status = 'accepted')
                 AND vendor_id = ?
             `, [vendorId]);
-            stats.pending = pendingRows[0].count || 0;
+            stats.activeOrders = pendingRows[0].count || 0;
         } catch (e) {
             console.error("Pending Orders Query Error:", e);
-            // Non-critical
+            stats.errors.push("Pending Orders: " + e.message);
+        }
+
+        // 3. Products count mapped to totalProducts
+        try {
+            const [productRows] = await db.query(`
+                SELECT COUNT(*) as count 
+                FROM vendor_products 
+                WHERE vendor_id = ?
+            `, [vendorId]);
+            stats.totalProducts = productRows[0].count || 0;
+        } catch (e) {
+            console.error("Products Count Query Error:", e);
+            stats.errors.push("Products: " + e.message);
         }
 
         // 3. Design Requests

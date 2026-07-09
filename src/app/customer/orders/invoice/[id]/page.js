@@ -91,8 +91,9 @@ export default function InvoicePage({ params }) {
     );
   }
 
-  const subtotal = order.items?.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0) || 0;
-  const shipping = Number(order.total || subtotal) > subtotal ? Number(order.total) - subtotal : 0;
+  const subtotal = Number(order.subtotal) || order.items?.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0) || 0;
+  const shipping = Number(order.shipping_fee) || 0;
+  const tax = Number(order.tax) || 0;
 
   const getStatusColor = (status) => {
     const s = (status || "").toLowerCase();
@@ -154,9 +155,9 @@ export default function InvoicePage({ params }) {
               <h1 className="text-4xl font-black tracking-tight text-[#F97316] mb-2">Stitch</h1>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Premium Atelier</p>
               <div className="mt-6 text-sm text-slate-500 space-y-1 font-medium">
-                <p>123 Stitch Avenue, Fashion District</p>
-                <p>Lahore, Pakistan, 54000</p>
-                <p>contact@stitch.com</p>
+                <p>100 Building, Stitch Avenue</p>
+                <p>Karachi, Pakistan, 54000</p>
+                <p>sefinalyear2026@gmail.com</p>
               </div>
             </div>
             <div className="text-right mt-6 md:mt-0">
@@ -164,8 +165,11 @@ export default function InvoicePage({ params }) {
               <div className="mt-6 text-sm text-slate-500 space-y-2 font-medium">
                 <p><span className="font-bold text-[#1E293B]">Invoice No:</span> #{order.id}</p>
                 <p><span className="font-bold text-[#1E293B]">Date:</span> {new Date(order.created_at).toLocaleDateString()}</p>
+                {order.shipping && (
+                  <p><span className="font-bold text-[#1E293B]">Shipping:</span> {order.shipping}</p>
+                )}
                 <p className="flex justify-end items-center gap-2 mt-3">
-                  <span className="font-bold text-[#1E293B]">Status:</span> 
+                  <span className="font-bold text-[#1E293B]">Status:</span>
                   <span className={`uppercase tracking-widest text-[9px] px-3 py-1 rounded-full font-black border ${getStatusColor(order.status)}`}>
                     {order.status || "Pending"}
                   </span>
@@ -175,7 +179,7 @@ export default function InvoicePage({ params }) {
           </div>
 
           {/* Customer Info */}
-          <div className="mb-12 text-sm leading-relaxed grid grid-cols-1 sm:grid-cols-2 gap-8">
+          <div className={`mb-12 text-sm leading-relaxed grid gap-8 ${order.vendor_company ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
             <div>
               <h3 className="font-black text-slate-300 text-[10px] uppercase tracking-widest mb-4">Bill To</h3>
               <div className="text-slate-500 font-medium">
@@ -192,6 +196,17 @@ export default function InvoicePage({ params }) {
                 <p className="mt-2">Phone: <span className="text-[#1E293B]">{order.phone_number}</span></p>
               </div>
             </div>
+            {order.vendor_company && (
+              <div>
+                <h3 className="font-black text-slate-300 text-[10px] uppercase tracking-widest mb-4">Fulfilled By</h3>
+                <div className="text-slate-500 font-medium">
+                  <p className="font-black text-[#1E293B] text-lg mb-1 tracking-tight uppercase">{order.vendor_company}</p>
+                  {order.vendor_specialization && (
+                    <p className="text-[#F97316] font-black text-[10px] uppercase tracking-widest">{order.vendor_specialization} Specialist</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -210,7 +225,9 @@ export default function InvoicePage({ params }) {
                   <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="py-5 px-2">
                       <div className="font-black text-[#1E293B]">{item.name}</div>
-                      <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Premium Crafted</div>
+                      <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                        {[item.color, item.material, item.size].filter(Boolean).join(' · ') || 'Premium Crafted'}
+                      </div>
                     </td>
                     <td className="py-5 px-2 text-right font-medium text-slate-600">{item.qty}</td>
                     <td className="py-5 px-2 text-right font-medium text-slate-600">Rs {Number(item.price).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</td>
@@ -228,9 +245,13 @@ export default function InvoicePage({ params }) {
                 <span className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Subtotal</span>
                 <span className="text-[#1E293B] font-black">Rs {Number(subtotal).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between items-center py-2 px-3 border-b border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex justify-between items-center py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
                 <span className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Shipping</span>
-                <span className="text-[#1E293B] font-black">Rs {Number(shipping).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span>
+                <span className="text-[#1E293B] font-black">{shipping === 0 ? 'FREE' : `Rs ${Number(shipping).toLocaleString("en-PK", { minimumFractionDigits: 2 })}`}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 px-3 border-b border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                <span className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Tax (17% GST)</span>
+                <span className="text-[#1E293B] font-black">Rs {Number(tax).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between items-center py-5 px-4 text-xl mt-4 rounded-2xl bg-orange-50 border border-orange-100">
                 <span className="text-[#F97316] font-black tracking-widest uppercase text-xs">Total</span>

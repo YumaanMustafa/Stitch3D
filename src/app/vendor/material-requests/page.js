@@ -43,26 +43,33 @@ export default function VendorMaterialRequests() {
   const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => {}, hideCancel: false });
   const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
 
-  useEffect(() => {
-    fetchRequests();
-    fetchSuppliers();
-  }, []);
-
-  const fetchRequests = async () => {
+  // API Call: fetches B2B requests initiated by the vendor
+  async function fetchRequests() {
     try {
       const token = localStorage.getItem("vendorToken");
       const res = await fetch("/api/vendor/material-requests", { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) setRequests(await res.json());
     } catch (err) {} finally { setLoading(false); }
-  };
+  }
 
-  const fetchSuppliers = async () => {
+  // API Call: fetches list of all suppliers for the dropdown field
+  async function fetchSuppliers() {
     try {
       const res = await fetch("/api/general/suppliers");
       if (res.ok) setSuppliers(await res.json());
     } catch (err) {}
-  };
+  }
 
+  // Lifecycle Hook: loads material requests history and available partner suppliers on mount
+  useEffect(() => {
+    // Wrapped in setTimeout to prevent React synchronous state update warning inside useEffect body
+    setTimeout(() => {
+      fetchRequests();
+      fetchSuppliers();
+    }, 0);
+  }, []);
+
+  // Formik submit handler: handles both creating a new request and editing an existing one
   const handleSubmit = async (values, { setSubmitting, resetForm }) => {
     try {
       const token = localStorage.getItem("vendorToken");
@@ -86,7 +93,7 @@ export default function VendorMaterialRequests() {
     } catch (err) {} finally { setSubmitting(false); }
   };
 
-  // QUOTE ACTIONS
+  // QUOTE ACTIONS: Accept a quotation sent by the supplier and convert it into a final order
   const handleAcceptQuote = async () => {
     if (!selectedBill) return;
     setIsProcessing(true);
@@ -111,6 +118,7 @@ export default function VendorMaterialRequests() {
     }
   };
 
+  // QUOTE ACTIONS: Submit a custom renegotiation price counter-offer and optional feedback message to the supplier
   const handleRenegotiate = async () => {
     if (!selectedBill || !renegotiatePrice || isNaN(renegotiatePrice) || Number(renegotiatePrice) <= 0) {
       showAlert("Invalid Price", "Please enter a valid counter offer price.", "warning");

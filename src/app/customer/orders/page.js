@@ -94,6 +94,20 @@ function formatDate(iso) {
 
 export default function OrdersPage() {
   const router = useRouter();
+
+  // State hooks managing order search, sorting, filtering, and interactions:
+  // - orders: Complete array of raw orders retrieved from the database
+  // - loading: State showing spinner/skeleton loaders during API fetch
+  // - query: Text query to search through orders or specific ordered item names
+  // - statusFilter: Select dropdown state (e.g. pending, completed, cancelled, all)
+  // - timeFilter: Restricts view to recent orders (e.g. last week, last month, all)
+  // - sortBy: Sort orders by price (high/low) or chronology (recent/oldest)
+  // - page: Current pagination page index
+  // - expandedOrder: The ID of the order currently expanded to view full details
+  // - busyOrders: Tracks loading/processing states individually for specific orders (e.g., during cancellation)
+  // - toast: Feedback alerts displayed to the user
+  // - isDeleteModalOpen: Toggle state for showing/hiding delete warning modal
+  // - orderToDelete: Reference ID of the order queued for cancellation/deletion
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -110,12 +124,13 @@ export default function OrdersPage() {
 
   const searchParams = useSearchParams();
 
+  // Shows temporary feedback alert toast notifications
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast({ message: "", type: "" }), 3000);
   };
 
-  // Helper
+  // Helper utility to safely retrieve auth bearer token from localStorage (client-side only)
   const getToken = () => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
@@ -123,6 +138,7 @@ export default function OrdersPage() {
     return null;
   };
 
+  // Fetch all orders on component mount/render and handle redirect if unauthenticated
   useEffect(() => {
     const t = getToken();
     if (!t) {
@@ -130,16 +146,18 @@ export default function OrdersPage() {
       return;
     }
 
-    // Check for order success
+    // Displays success toast if redirecting from checkout on successful order placement
     if (searchParams.get("success") === "true") {
-      showToast("success", "Order placed successfully!");
+      setTimeout(() => {
+        showToast("success", "Order placed successfully!");
+      }, 0);
       router.replace("/customer/orders", undefined, { shallow: true });
     }
 
     (async () => {
       try {
         setLoading(true);
-        // Use relative path
+        // Call order history API endpoint
         const res = await fetch(`/api/customer/orders/my`, {
           headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
         });
@@ -162,12 +180,14 @@ export default function OrdersPage() {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  // Processes complex client-side search, filtering, and sorting of orders via useMemo for performance
   const filtered = useMemo(() => {
     let result = orders;
 
-    // Query filter
+    // A. Query Filter: searches order ID and matches item names inside each order
     const q = query.trim().toLowerCase();
     if (q) {
       result = result.filter(
@@ -177,12 +197,12 @@ export default function OrdersPage() {
       );
     }
 
-    // Status filter
+    // B. Status Filter: filters by order status (e.g. pending, completed, cancelled)
     if (statusFilter !== "all") {
       result = result.filter((o) => o.status === statusFilter);
     }
 
-    // Time filter
+    // C. Time Filter: restricts orders based on creation date limits (week, month)
     if (timeFilter !== "all") {
       const now = new Date();
       result = result.filter((o) => {
@@ -194,7 +214,7 @@ export default function OrdersPage() {
       });
     }
 
-    // Sorting
+    // D. Sorting: applies selected order sequence (date or price)
     if (sortBy === "recent") {
       result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (sortBy === "oldest") {
@@ -208,12 +228,14 @@ export default function OrdersPage() {
     return result;
   }, [orders, query, statusFilter, timeFilter, sortBy]);
 
+  // Pagination bounds calculation
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
 
   const handlePrev = () => setPage((p) => Math.max(1, p - 1));
   const handleNext = () => setPage((p) => Math.min(totalPages, p + 1));
 
+  // Submits DELETE request to cancel/delete a pending order
   const confirmDelete = async () => {
     if (!orderToDelete) return;
     const orderId = orderToDelete;
@@ -223,6 +245,7 @@ export default function OrdersPage() {
       router.replace("/login");
       return;
     }
+    // Set individual loading status for the current target order
     setBusyOrders((b) => ({ ...b, [orderId]: true }));
     try {
       const res = await fetch(`/api/customer/orders/${encodeURIComponent(orderId)}`, {
@@ -232,7 +255,7 @@ export default function OrdersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Delete failed");
 
-      // Remove from list
+      // Update state to remove the cancelled order from UI
       setOrders((prev) => prev.filter(o => o.id !== orderId));
 
       showToast("success", data.message || "Order deleted");
@@ -399,7 +422,7 @@ export default function OrdersPage() {
             </div>
             <p className="text-2xl font-black text-gray-900 mb-3">No orders found</p>
             <p className="text-gray-500 mb-8 max-w-md mx-auto leading-relaxed">
-              We couldn't find any orders matching your criteria. Try adjusting your filters or place your first order.
+              We couldn&apos;t find any orders matching your criteria. Try adjusting your filters or place your first order.
             </p>
             <Button variant="solid" onClick={() => router.push('/customer/shop')}>
               Browse Collection
@@ -596,7 +619,13 @@ export default function OrdersPage() {
                             </button>
 
                             <button
-                              onClick={() => showToast("info", "Chat with seller feature coming soon!")}
+                              onClick={() => {
+                                if (order.vendor_user_id) {
+                                  router.push(`/customer/messages?vendorUserId=${order.vendor_user_id}`);
+                                } else {
+                                  router.push("/customer/support");
+                                }
+                              }}
                               className="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition-colors flex items-center gap-2"
                             >
                               <MessageSquare className="w-4 h-4" />

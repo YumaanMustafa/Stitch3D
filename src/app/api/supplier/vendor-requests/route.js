@@ -23,6 +23,9 @@ async function getSupplierFromToken(request) {
     }
 }
 
+// ==========================================
+// GET HANDLER: Handles GET requests for src/app/api/supplier/vendor-requests/route.js
+// ==========================================
 export async function GET(request) {
     try {
         const supplier = await getSupplierFromToken(request);

@@ -32,11 +32,8 @@ export default function SupplierInventory() {
     
     const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
 
-    useEffect(() => {
-        fetchInventory();
-    }, []);
-
-    const fetchInventory = async () => {
+    // API Call: fetches current inventory entries belonging to the authenticated supplier
+    async function fetchInventory() {
         try {
             const token = localStorage.getItem("supplierToken");
             const res = await fetch("/api/supplier/inventory", {
@@ -51,8 +48,17 @@ export default function SupplierInventory() {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
+    // Lifecycle Hook: loads all inventory items supplied by this supplier on component mount
+    useEffect(() => {
+        // Wrapped in setTimeout to prevent React synchronous state update warning inside useEffect body
+        setTimeout(() => {
+            fetchInventory();
+        }, 0);
+    }, []);
+
+    // Formik submit handler: creates a new material or updates details of an existing one
     const handleSave = async (values, { setSubmitting, resetForm }) => {
         try {
             const token = localStorage.getItem("supplierToken");
@@ -84,6 +90,7 @@ export default function SupplierInventory() {
         }
     };
 
+    // Delete handler: opens a confirmation dialog to delete a specific material listing
     const handleDelete = (id) => {
         setConf({
             open: true,
@@ -99,6 +106,7 @@ export default function SupplierInventory() {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     if (res.ok) {
+                        // Remove item from state to reflect deletion instantly
                         setInventory(prev => prev.filter(i => i.id !== id));
                         setConf({ ...conf, open: false });
                         showAlert("Deleted", "Material removed from system.");

@@ -10,6 +10,9 @@ import jwt from 'jsonwebtoken';
  * Ensures suppliers cannot login until approved by Admin.
  */
 
+// ==========================================
+// POST HANDLER: Handles POST requests for src/app/api/auth/supplier/login/route.js
+// ==========================================
 export async function POST(request) {
     try {
         const body = await request.json();

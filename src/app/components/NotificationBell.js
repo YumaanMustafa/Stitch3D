@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bell, Check, Clock, AlertCircle, ShoppingBag, MessageSquare, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 /**
  * @file NotificationBell.js
@@ -10,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
  */
 
 export default function NotificationBell({ role, tokenKey }) {
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -85,6 +87,40 @@ export default function NotificationBell({ role, tokenKey }) {
         }
     };
 
+    const getNotificationRoute = (n) => {
+        const type = (n.type || "").toLowerCase();
+        const title = (n.title || "").toLowerCase();
+
+        if (role === "vendor") {
+            if (title.includes("quote") || title.includes("request") || title.includes("material") || title.includes("quotation") || type === "request") {
+                return "/vendor/material-requests";
+            }
+            if (type === "order") return "/vendor/orders";
+            if (title.includes("review")) return "/vendor/reviews";
+            if (title.includes("message") || type === "message") return "/vendor/messages";
+        } else if (role === "supplier") {
+            if (type === "request" || type === "order" || title.includes("request") || title.includes("material") || title.includes("quotation")) {
+                return "/supplier/vendor-requests";
+            }
+            if (title.includes("message") || type === "message") return "/supplier/messages";
+        } else if (role === "customer") {
+            if (type === "order" || type === "status") return "/customer/orders";
+            if (title.includes("complaint")) return "/customer/complaints";
+        } else if (role === "admin") {
+            if (title.includes("complaint")) return "/admin/complaints";
+        }
+        return `/${role}/dashboard`;
+    };
+
+    const handleNotificationClick = async (n) => {
+        if (!n.is_read) {
+            await markAsRead(n.id);
+        }
+        setIsOpen(false);
+        const route = getNotificationRoute(n);
+        window.location.href = route;
+    };
+
     return (
         <div className="relative" ref={bellRef}>
             <button 
@@ -142,7 +178,7 @@ export default function NotificationBell({ role, tokenKey }) {
                                         {notifications.map((n) => (
                                             <div 
                                                 key={n.id} 
-                                                onClick={() => !n.is_read && markAsRead(n.id)}
+                                                onClick={() => handleNotificationClick(n)}
                                                 className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer flex gap-3 ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
                                             >
                                                 <div className="mt-1 shrink-0">{getIcon(n.type)}</div>
@@ -183,7 +219,8 @@ export default function NotificationBell({ role, tokenKey }) {
                                 initial={{ opacity: 0, y: 20, scale: 0.9 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.9 }}
-                                className="bg-white/95 backdrop-blur-xl border border-indigo-100 shadow-2xl rounded-2xl p-4 w-80 pointer-events-auto flex gap-3 items-start"
+                                onClick={() => handleNotificationClick(p)}
+                                className="bg-white/95 backdrop-blur-xl border border-indigo-100 shadow-2xl rounded-2xl p-4 w-80 pointer-events-auto flex gap-3 items-start cursor-pointer hover:bg-slate-50 transition-all"
                             >
                                 <div className="shrink-0 mt-0.5 bg-indigo-50 p-2 rounded-full">
                                     {getIcon(p.type)}
