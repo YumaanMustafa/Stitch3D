@@ -24,6 +24,7 @@ export default function VendorLogin() {
 
   const handleLogin = async (values, { setSubmitting }) => {
     setServerMessage("");
+    setLoading(true); // Show spinner while fetching
     try {
       const res = await fetch("/api/auth/vendor/login", {
         method: "POST",
@@ -35,7 +36,6 @@ export default function VendorLogin() {
       if (res.ok) {
         localStorage.setItem("vendorToken", data.token);
         setIsSuccess(true);
-        setLoading(true);
         setServerMessage("Login successful! Redirecting...");
         setTimeout(() => router.push("/vendor/dashboard"), 1000);
       } else {
@@ -45,9 +45,11 @@ export default function VendorLogin() {
         }
         setServerMessage(data.message || "Invalid email or password");
         setIsSuccess(false);
+        setLoading(false); // Hide spinner on failure
       }
     } catch (err) {
       setServerMessage("Connection error. Please try again.");
+      setLoading(false); // Hide spinner on failure
     } finally {
       setSubmitting(false);
     }

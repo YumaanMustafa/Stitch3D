@@ -1,18 +1,24 @@
+// Import Next.js tool for sending responses
 import { NextResponse } from 'next/server';
+// Import the database tool
 import db from '@/lib/db';
+// Import authentication tools
 import { getCustomerFromRequest } from '../../../../lib/auth';
 
 /**
- * @file route.js
- * @description Customer Reviews API.
- * Allows customers to submit reviews for products they have purchased and received.
+ * File: route.js
+ * Location: src/app/api/customer/reviews/route.js
+ * Description: Customer Reviews API.
+ * This route allows customers to submit 1-5 star ratings and reviews for products, 
+ * but ONLY if they actually bought the product and it was delivered to them!
  */
 
 // ==========================================
-// POST HANDLER: Handles POST requests for src/app/api/customer/reviews/route.js
+// POST HANDLER: Submit a new product review
 // ==========================================
 export async function POST(request) {
     try {
+        // Step 1: Security Check
         const payload = getCustomerFromRequest(request);
         console.log("Review API: Payload", payload);
         if (!payload) {
@@ -28,20 +34,24 @@ export async function POST(request) {
         
         const customerId = customerRows[0].customer_id;
 
+        // Step 2: Read the review details the customer submitted
         const { productId, rating, reviewText } = await request.json();
 
         if (!productId || rating === undefined || rating === null) {
             return NextResponse.json({ error: 'Product ID and Rating are required' }, { status: 400 });
         }
 
-        // 1. Validation
+        // Step 3: Validate the Rating and Text
         const parsedRating = parseInt(rating, 10);
+        // They can't submit a 0-star or 6-star review!
         if (isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
             return NextResponse.json({ error: 'Rating must be an integer between 1 and 5' }, { status: 400 });
         }
+        // Prevent abuse: limit the review text to 1000 characters
         const safeReviewText = reviewText && reviewText.length > 1000 ? reviewText.substring(0, 1000) : reviewText;
 
-        // 2. Explicitly verify this is a Standard Vendor Product (not a custom design)
+        // Step 4: Ensure the product they are reviewing is a standard shop item
+        // (You can't review your own custom 3D jacket design)
         const [productCheck] = await db.query('SELECT id, vendor_id, name FROM vendor_products WHERE id = ?', [productId]);
         if (productCheck.length === 0) {
             return NextResponse.json({ 
@@ -50,6 +60,10 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
+        // Step 5: The "Verified Buyer" Check
+        // We look through all their past orders. We ONLY allow them to review this product IF:
+        // 1. They actually ordered it
+        // 2. The order status is 'delivered' or 'completed'
         console.log("Review API: Checking order for customer", customerId, "product", productId);
         const [orderCheck] = await db.query(`
             SELECT o.order_id 
@@ -61,8 +75,6 @@ export async function POST(request) {
             LIMIT 1
         `, [customerId, productId]);
 
-        console.log("Review API: Order check result", orderCheck);
-
         if (orderCheck.length === 0) {
             return NextResponse.json({ 
                 error: 'Review Restricted', 
@@ -70,12 +82,15 @@ export async function POST(request) {
             }, { status: 403 });
         }
 
-        // 3. Transactions for Review Insertion & Cache Update
+        // Step 6: Save the Review
+        // We use a "Transaction" here. A transaction ensures that multiple database updates 
+        // all succeed together. If one fails, it reverses everything so the database doesn't break.
         const connection = await db.getConnection();
         await connection.beginTransaction();
 
         try {
             // Prevent Duplicate Reviews
+            // If they already reviewed this item, we just UPDATE their old review instead of making a second one.
             const [existingReview] = await connection.query(
                 'SELECT id FROM product_reviews WHERE product_id = ? AND customer_id = ?',
                 [productId, customerId]
@@ -87,14 +102,15 @@ export async function POST(request) {
                     [parsedRating, safeReviewText, existingReview[0].id]
                 );
             } else {
-                // Insert Review
                 await connection.query(
                     'INSERT INTO product_reviews (product_id, customer_id, rating, review_text) VALUES (?, ?, ?, ?)',
                     [productId, customerId, parsedRating, safeReviewText]
                 );
             }
 
-            // Update Product Cache Columns (Optimization)
+            // Step 7: Update the Product's overall rating score
+            // Instead of calculating the average rating every single time a customer looks at a product, 
+            // we calculate it once right now and save it directly onto the product record.
             const [stats] = await connection.query(
                 'SELECT AVG(rating) as avgRating, COUNT(*) as count FROM product_reviews WHERE product_id = ?',
                 [productId]
@@ -105,8 +121,10 @@ export async function POST(request) {
                 [stats[0].avgRating || 0, stats[0].count || 0, productId]
             );
 
+            // Everything worked! "Commit" the transaction to save it permanently.
             await connection.commit();
 
+            // Step 8: Notify the Vendor
             try {
                 const vendorId = productCheck[0].vendor_id;
                 const productName = productCheck[0].name;
@@ -126,12 +144,15 @@ export async function POST(request) {
                 console.error("Non-fatal notification error:", err);
             }
 
+            // Tell the browser success!
             return NextResponse.json({ success: true, message: 'Review submitted successfully!' });
 
         } catch (txnError) {
+            // If anything inside the try block failed, "rollback" (reverse) the changes
             await connection.rollback();
-            throw txnError; // Pass to outer catch block for standard error response
+            throw txnError; 
         } finally {
+            // Always release the database connection when done
             connection.release();
         }
 
@@ -142,10 +163,11 @@ export async function POST(request) {
 }
 
 // ==========================================
-// DELETE HANDLER: Handles DELETE requests for src/app/api/customer/reviews/route.js
+// DELETE HANDLER: Delete a review
 // ==========================================
 export async function DELETE(request) {
     try {
+        // Step 1: Security Check
         const payload = getCustomerFromRequest(request);
         if (!payload) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -159,6 +181,8 @@ export async function DELETE(request) {
         }
         
         const customerId = customerRows[0].customer_id;
+        
+        // Grab the ID of the product from the URL
         const { searchParams } = new URL(request.url);
         const productId = searchParams.get('productId');
 
@@ -166,16 +190,19 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
         }
 
+        // Step 2: Transaction Setup
         const connection = await db.getConnection();
         await connection.beginTransaction();
 
         try {
+            // Delete the review
+            // We include `customer_id = ?` to guarantee they can only delete their OWN review!
             await connection.query(
                 'DELETE FROM product_reviews WHERE product_id = ? AND customer_id = ?',
                 [productId, customerId]
             );
 
-            // Update Product Cache Columns (Optimization)
+            // Step 3: Recalculate the product's overall rating score now that a review is gone
             const [stats] = await connection.query(
                 'SELECT AVG(rating) as avgRating, COUNT(*) as count FROM product_reviews WHERE product_id = ?',
                 [productId]
@@ -186,7 +213,9 @@ export async function DELETE(request) {
                 [stats[0].avgRating || 0, stats[0].count || 0, productId]
             );
 
+            // Save the changes permanently
             await connection.commit();
+            
             return NextResponse.json({ success: true, message: 'Review deleted successfully!' });
 
         } catch (txnError) {

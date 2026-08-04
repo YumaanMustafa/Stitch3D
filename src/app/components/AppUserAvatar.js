@@ -1,7 +1,9 @@
 "use client";
-
+// Import React hooks for tracking state and side effects
 import { useState } from "react";
+// Import framer-motion for smooth drop-down animations
 import { motion, AnimatePresence } from "framer-motion";
+// Import icons used inside the dropdown menu
 import {
   User as UserIcon,
   Settings,
@@ -10,11 +12,19 @@ import {
 } from "lucide-react";
 
 /**
- * @file UserAvatar.js
- * @description User Profile Avatar & Dropdown Menu.
- * Handles logout confirmation and navigation to profile/settings.
+ * File: AppUserAvatar.js
+ * Description: User Profile Avatar button & Dropdown Menu.
+ * Shows the user's initials or profile picture. Clicking it opens a dropdown
+ * with links to Profile, Settings, and Logout.
+ * Includes a confirmation popup when the user tries to logout.
  */
 
+// UserAvatarMenu component
+// initials: letters to show if no image is available
+// profileImage: URL of user's uploaded profile picture
+// isOpen: boolean controlling if the dropdown is currently open
+// onToggle: function called when the avatar button is clicked
+// onLogout: function called when the user confirms they want to logout
 export default function UserAvatarMenu({
   initials,
   profileImage,
@@ -22,25 +32,33 @@ export default function UserAvatarMenu({
   onToggle,
   onLogout,
 }) {
+  // State to control whether the logout confirmation popup is visible
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  // Called when user clicks the "Logout" option in the dropdown menu
   const handleLogoutClick = () => {
+    // Show the confirmation popup instead of logging out immediately
     setShowLogoutConfirm(true);
   };
 
+  // Called when user clicks "Cancel" in the logout popup
   const handleCancelLogout = () => {
+    // Hide the confirmation popup
     setShowLogoutConfirm(false);
   };
 
+  // Called when user clicks "Logout" in the confirmation popup
   const handleConfirmLogout = () => {
+    // Hide the popup and call the actual logout function passed from parent
     setShowLogoutConfirm(false);
     onLogout();
   };
 
   return (
     <>
-      {/* Avatar + Dropdown */}
+      {/* Avatar Button & Dropdown Menu Container */}
       <div className="relative">
+        {/* The clickable avatar button */}
         <motion.button
           onClick={onToggle}
           whileTap={{ scale: 0.96 }}
@@ -49,6 +67,7 @@ export default function UserAvatarMenu({
           aria-haspopup="true"
         >
           <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold overflow-hidden">
+            {/* If user has a profile image, show it, otherwise show their initials */}
             {profileImage ? (
               <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
             ) : (
@@ -57,6 +76,7 @@ export default function UserAvatarMenu({
           </div>
         </motion.button>
 
+        {/* AnimatePresence handles the smooth slide-in and fade-out of the dropdown */}
         <AnimatePresence>
           {isOpen && (
             <motion.div
@@ -66,6 +86,7 @@ export default function UserAvatarMenu({
               transition={{ duration: 0.16 }}
               className="absolute right-0 mt-3 w-44 bg-white rounded-lg shadow-xl border border-slate-200 z-40 overflow-hidden"
             >
+              {/* Profile Link */}
               <a
                 href="/customer/profile"
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
@@ -74,6 +95,7 @@ export default function UserAvatarMenu({
                 Profile
               </a>
 
+              {/* Settings Link */}
               <a
                 href="/customer/settings"
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
@@ -82,6 +104,7 @@ export default function UserAvatarMenu({
                 Settings
               </a>
 
+              {/* Logout Button inside the dropdown */}
               <button
                 onClick={handleLogoutClick}
                 className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors text-left"
@@ -94,11 +117,11 @@ export default function UserAvatarMenu({
         </AnimatePresence>
       </div>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout Confirmation Modal Overlay */}
       <AnimatePresence>
         {showLogoutConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
+            {/* Dark background overlay behind the modal */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -107,7 +130,7 @@ export default function UserAvatarMenu({
               onClick={handleCancelLogout}
             />
 
-            {/* Modal */}
+            {/* The white confirmation box */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -115,6 +138,7 @@ export default function UserAvatarMenu({
               className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100"
             >
               <div className="flex flex-col items-center text-center">
+                {/* Warning icon */}
                 <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mb-4">
                   <AlertTriangle className="w-6 h-6 text-rose-600" />
                 </div>
@@ -127,6 +151,7 @@ export default function UserAvatarMenu({
                   Are you sure you want to logout?
                 </p>
 
+                {/* Cancel and Confirm buttons side by side */}
                 <div className="mt-6 flex gap-3 w-full">
                   <button
                     onClick={handleCancelLogout}

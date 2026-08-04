@@ -1,36 +1,45 @@
+// Import Next.js tool for sending responses
 import { NextResponse } from 'next/server';
+// Import the database tool
 import db from '@/lib/db';
+// Import our custom auth tools
 import { getVendorFromRequest, getVendorIdFromUser } from '@/lib/auth';
 
+// Prevent Next.js from caching this page so stats are always fresh
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @file route.js
- * @description Vendor Dashboard Statistics API.
- * Aggregates key metrics for the vendor strictly by vendor_id.
+ * File: route.js
+ * Location: src/app/api/vendor/dashboard/stats/route.js
+ * Description: Vendor Dashboard Statistics API.
+ * Gathers all the numbers, charts, and metrics needed for the Vendor's 
+ * main dashboard screen (revenue, active orders, total products, etc.).
  */
 
+// ==========================================
+// HELPER FUNCTION: Get Vendor ID safely
+// ==========================================
 async function getVendorId(request) {
     try {
         const payload = getVendorFromRequest(request);
         if (!payload) return null;
+        // This converts the generic 'user_id' into the specific 'vendor_id' we need for our queries
         return await getVendorIdFromUser(payload);
     } catch (e) {
         return null;
     }
 }
 
-/**
- * GET handler to fetch vendor stats.
- */
 // ==========================================
-// GET HANDLER: Handles GET requests for src/app/api/vendor/dashboard/stats/route.js
+// GET HANDLER: Handles GET requests to load the Vendor Dashboard
 // ==========================================
 export async function GET(request) {
+    // Step 1: Security Check
     const vendorId = await getVendorId(request);
     if (!vendorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Step 2: Set up a default empty stats object
     const stats = {
         revenue: 0,
         activeOrders: 0,
@@ -38,11 +47,12 @@ export async function GET(request) {
         growth: 0,
         chart: [],
         actions: [],
-        errors: [] // Debug info
+        errors: [] // We use this to quietly log errors without crashing the whole dashboard
     };
 
     try {
-        // 1. Orders Stats (Revenue and Growth)
+        // Step 3: Calculate Revenue
+        // We sum up the 'total' column of every order belonging to this vendor
         try {
             const [revenueRows] = await db.query(`
                 SELECT 
@@ -52,7 +62,7 @@ export async function GET(request) {
             `, [vendorId]);
             stats.revenue = Number(revenueRows[0].revenue || 0);
 
-            // Mock growth based on revenue (just for visuals)
+            // Mock growth percentage (just for visuals)
             stats.growth = stats.revenue > 0 ? 12.5 : 0;
 
         } catch (e) {
@@ -60,7 +70,7 @@ export async function GET(request) {
             stats.errors.push("Orders: " + e.message);
         }
 
-        // 2. Pending Orders count mapped to activeOrders
+        // Step 4: Count Active/Pending Orders
         try {
             const [pendingRows] = await db.query(`
                 SELECT COUNT(*) as count 
@@ -74,7 +84,7 @@ export async function GET(request) {
             stats.errors.push("Pending Orders: " + e.message);
         }
 
-        // 3. Products count mapped to totalProducts
+        // Step 5: Count Total Products in their shop
         try {
             const [productRows] = await db.query(`
                 SELECT COUNT(*) as count 
@@ -87,7 +97,7 @@ export async function GET(request) {
             stats.errors.push("Products: " + e.message);
         }
 
-        // 3. Design Requests
+        // Step 6: Count Custom Design Requests from customers
         try {
             const [requestRows] = await db.query(`
                 SELECT COUNT(*) as count 
@@ -100,7 +110,7 @@ export async function GET(request) {
             stats.errors.push("Requests: " + e.message);
         }
 
-        // 4. Reviews Count
+        // Step 7: Count Total Reviews across all products
         try {
             const [reviewRows] = await db.query(`
                 SELECT SUM(total_reviews) as count 
@@ -113,7 +123,8 @@ export async function GET(request) {
             stats.total_reviews = 0;
         }
 
-        // 5. Actions List
+        // Step 8: Build the "Action Needed" Queue
+        // Get the top 3 oldest pending design requests that need the vendor's attention
         try {
             const [actions] = await db.query(`
                 SELECT 
@@ -132,7 +143,9 @@ export async function GET(request) {
             stats.actions = [];
         }
 
-        // 6. Chart (Mock based on revenue)
+        // Step 9: Build the line chart
+        // Note: In a real app this would query the DB grouped by month. Here we use 
+        // a simple math formula based on total revenue to generate a good looking chart.
         stats.chart = [
             { name: 'Jan', revenue: stats.revenue * 0.1 },
             { name: 'Feb', revenue: stats.revenue * 0.15 },
@@ -142,9 +155,11 @@ export async function GET(request) {
             { name: 'Jun', revenue: stats.revenue * 0.25 },
         ];
 
+        // Send the fully populated stats object back to the dashboard
         return NextResponse.json(stats);
 
     } catch (globalError) {
+        // Log completely fatal dashboard crashes
         console.error("Stats API Critical Error:", globalError);
         return NextResponse.json({
             error: "Critical Failure",

@@ -1,10 +1,16 @@
 "use client";
 
+// Import React hooks for managing state and side effects
 import React, { useEffect, useRef, useState } from "react";
+// Import Link for fast client-side navigation between pages
 import Link from "next/link";
+// Import hooks to get the current route and navigation tools
 import { useRouter, usePathname } from "next/navigation";
+// Import Framer Motion for smooth animations
 import { motion, AnimatePresence } from "framer-motion";
+// Import global cart state to show the number of items in the cart
 import { useCart } from "../context/CartContext";
+// Import all the icons we need for the navigation menu
 import {
   ShoppingCart,
   Sun,
@@ -21,35 +27,47 @@ import {
   MessageSquare,
   ChevronDown,
 } from "lucide-react";
+// Import custom components used inside the header
 import UserAvatarMenu from "./AppUserAvatar";
 import NotificationBell from "./NotificationBell";
 
 /**
- * @file Header.js
- * @description Main Navigation Header.
- * Adapts to user role (Customer, Vendor, Admin) and handles mobile menu, profile dropdown, and cart count.
- * Fetches user profile on mount to display name/avatar.
+ * File: AppHeader.js
+ * Description: The main top navigation bar for the entire website.
+ * It changes its links based on whether the user is a Customer, Vendor, Supplier, or Admin.
+ * Handles mobile menu toggling, profile dropdown, and shows the shopping cart count.
  */
 
 export default function Header() {
-  const router = useRouter();
-  const pathname = usePathname();
+  const router = useRouter(); // Used to redirect the user to other pages
+  const pathname = usePathname(); // Gets the current URL path to highlight the active link
 
-  // State management
-  const { cartCount } = useCart(); // Use Global Cart State
-  const [notificationCount, setNotificationCount] = useState(3);
-  const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isDarkMode, setDarkMode] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [userRole, setUserRole] = useState("customer");
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // STATE MANAGEMENT
+  // ==========================================
+  // Get the cart count from the global context
+  const { cartCount } = useCart(); 
+  
+  // Local state variables
+  const [notificationCount, setNotificationCount] = useState(3); // Fake notification count for now
+  const [isProfileMenuOpen, setProfileMenuOpen] = useState(false); // Controls desktop profile dropdown
+  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false); // Controls mobile hamburger menu
+  const [isDarkMode, setDarkMode] = useState(false); // Controls light/dark mode toggle
+  const [profile, setProfile] = useState(null); // Stores user's name and image from database
+  const [userRole, setUserRole] = useState("customer"); // Determines which links to show
+  const [loading, setLoading] = useState(true); // True while fetching user profile on first load
 
-  // Refs
+  // ==========================================
+  // REFS
+  // ==========================================
+  // Refs are used to detect clicks outside the menus to close them automatically
   const menuRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
-  // Navigation links by user role
+  // ==========================================
+  // NAVIGATION LINKS CONFIGURATION
+  // ==========================================
+  // Define the menu links for each type of user
   const navLinks = {
     customer: [
       { name: "Dashboard", href: "/customer/dashboard", icon: Home },
@@ -63,8 +81,6 @@ export default function Header() {
       { name: "Products", href: "/vendor/products", icon: Shirt },
       { name: "Orders", href: "/vendor/orders", icon: ShoppingCart },
       { name: "Settings", href: "/vendor/settings", icon: Settings },
-      // { name: "Analytics", href: "/vendor/analytics", icon: Heart }, // Coming Soon
-      // { name: "Messages", href: "/vendor/messages", icon: MessageSquare }, // Coming Soon
     ],
     supplier: [
       { name: "Dashboard", href: "#", icon: Home }, // Coming Soon
@@ -80,19 +96,29 @@ export default function Header() {
     ],
   };
 
-  // Load profile on mount
+  // ==========================================
+  // INITIALIZATION EFFECT
+  // ==========================================
+  // Runs once when the header loads. Checks local storage for tokens and fetches profile.
   useEffect(() => {
+    // Safely check local storage (checking for 'window' prevents errors during server-side rendering)
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : "customer";
-    setUserRole(role || "customer");
+    
+    setUserRole(role || "customer"); // Fallback to customer if no role found
+    
+    // If they have a token, fetch their profile data from the API
     if (token) {
       fetchProfile(token);
     } else {
-      setLoading(false);
+      setLoading(false); // Not logged in, so stop loading
     }
   }, []);
 
-  // Fetch user profile
+  // ==========================================
+  // API: FETCH PROFILE
+  // ==========================================
+  // Calls the backend to get the user's name and picture
   const fetchProfile = async (token) => {
     try {
       const response = await fetch("/api/auth/profile", {
@@ -105,6 +131,7 @@ export default function Header() {
 
       if (response.ok) {
         const data = await response.json();
+        // Save the profile info to state so the UI can display it
         setProfile({
           firstName: data.first_name || data.firstName || "",
           lastName: data.last_name || data.lastName || "",
@@ -112,30 +139,42 @@ export default function Header() {
           profileImage: data.profile_image || null,
         });
       } else {
+        // If token is invalid/expired, remove it
         localStorage.removeItem("token");
       }
     } catch (error) {
       console.error("Profile fetch error:", error);
     } finally {
-      setLoading(false);
+      setLoading(false); // Always stop loading spinner when done
     }
   };
-  // Close menus on outside click
+
+  // ==========================================
+  // EFFECT: CLICK OUTSIDE TO CLOSE MENUS
+  // ==========================================
+  // This listens for clicks anywhere on the page and closes dropdowns if you click outside them
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if profile menu is open and the click was outside of it
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setProfileMenuOpen(false);
       }
+      // Check if mobile menu is open and the click was outside of it
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         setMobileMenuOpen(false);
       }
     };
 
+    // Attach listener when component mounts
     document.addEventListener("click", handleClickOutside);
+    // Cleanup listener when component unmounts
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // Handle logout
+  // ==========================================
+  // ACTION: HANDLE LOGOUT
+  // ==========================================
+  // Calls the logout API, clears local storage, and redirects to login screen
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", {
@@ -146,22 +185,27 @@ export default function Header() {
     } catch (error) {
       console.warn("Logout network error:", error);
     } finally {
+      // Always clean up local storage even if API fails
       localStorage.removeItem("token");
       localStorage.removeItem("userRole");
       setProfile(null);
+      // Send user back to the login page
       router.replace("/customer-auth/login");
     }
   };
 
-  // Check if route is active
+  // Helper function to check if the current URL matches the link URL (used to highlight active links)
   const isActive = (href) => pathname === href;
 
-  // Get user initials
+  // Extract the first letter of the user's name for the fallback avatar, default to 'N' if no name
   const initials = profile?.firstName?.[0]?.toUpperCase() || "N";
 
-  // Get current nav links based on role
+  // Select the correct set of links to show based on if they are customer/vendor/etc.
   const currentNavLinks = navLinks[userRole] || navLinks.customer;
 
+  // ==========================================
+  // RENDER: LOADING STATE
+  // ==========================================
   if (loading) {
     return (
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
@@ -172,17 +216,25 @@ export default function Header() {
     );
   }
 
+  // ==========================================
+  // RENDER: MAIN HEADER
+  // ==========================================
   return (
+    // Sticky header stays at the top of the screen when scrolling down
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
+          
+          {/* ==========================================
+              LEFT SECTION: LOGO & DASHBOARD BUTTON 
+              ========================================== */}
           <motion.div
-            initial={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: -10 }} // Slide in from left on load
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
             className="flex items-center gap-4"
           >
+            {/* The Logo Link back to homepage */}
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-10 h-10 flex items-center justify-center bg-[#1E293B] rounded-xl overflow-hidden shadow-lg group-hover:shadow-orange-500/20 transition-all">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#F97316] to-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -193,14 +245,17 @@ export default function Header() {
                 <div className="text-xl font-black tracking-tighter flex items-center gap-0.5">
                   <span className="text-[#1E293B]">Stitch</span>
                 </div>
+                {/* Animated underline under 'Stitch' on hover */}
                 <div className="h-0.5 w-0 bg-[#F97316] group-hover:w-full transition-all duration-500" />
               </div>
             </Link>
 
+            {/* Vertical divider line (only shows if logged in) */}
             {profile && (
               <div className="hidden sm:block h-8 w-px bg-slate-200 mx-2" />
             )}
 
+            {/* Dashboard Button next to logo (only shows if logged in) */}
             {profile && (
               <Link 
                 href={`/${userRole}/dashboard`}
@@ -212,12 +267,17 @@ export default function Header() {
             )}
           </motion.div>
 
-          {/* Desktop Navigation */}
+          {/* ==========================================
+              CENTER SECTION: DESKTOP NAVIGATION LINKS 
+              ========================================== */}
+          {/* Hidden on mobile (lg:flex means show only on large screens) */}
           <nav className="hidden lg:flex items-center gap-1">
+            {/* Loop over the nav links for the current role and render them */}
             {currentNavLinks.map(({ name, href, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
+                // If it's the active page, color it indigo. Otherwise gray.
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${isActive(href)
                   ? "bg-indigo-50 text-indigo-600"
                   : "text-gray-700 hover:bg-gray-50"
@@ -229,9 +289,12 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Right Actions */}
+          {/* ==========================================
+              RIGHT SECTION: ACTIONS & PROFILE 
+              ========================================== */}
           <div className="flex items-center gap-2 md:gap-4">
-            {/* Search (Desktop only) */}
+            
+            {/* Search Bar (Desktop only) */}
             <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition">
               <svg
                 className="w-4 h-4 text-gray-500"
@@ -253,23 +316,25 @@ export default function Header() {
               />
             </div>
 
-            {/* Notifications */}
+            {/* Notification Bell Component */}
             <NotificationBell 
                 role={userRole} 
                 tokenKey={userRole === 'customer' ? 'token' : userRole === 'vendor' ? 'vendorToken' : userRole === 'admin' ? 'adminToken' : 'supplierToken'} 
             />
 
-            {/* Shopping Cart (Customer only) */}
+            {/* Shopping Cart Icon (Only shows for Customers) */}
             {userRole === "customer" && (
+              // Add a bouncy animation when user hovers or taps the cart
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
                 <Link
                   href="/customer/cart"
                   className="relative p-2 rounded-xl hover:bg-gray-100 transition inline-block"
                 >
                   <ShoppingCart size={20} className="text-gray-600" />
+                  {/* If there are items in the cart, show the red badge with the number */}
                   {cartCount > 0 && (
                     <motion.span
-                      key={cartCount}
+                      key={cartCount} // Changing key triggers the bounce animation when count updates
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: "spring", stiffness: 400, damping: 20 }}
@@ -282,14 +347,15 @@ export default function Header() {
               </motion.div>
             )}
 
-            {/* Theme Toggle */}
+            {/* Dark Mode Toggle Button */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setDarkMode(!isDarkMode)}
+              onClick={() => setDarkMode(!isDarkMode)} // Flip the boolean when clicked
               className="p-2 rounded-xl hover:bg-gray-100 transition hidden sm:block"
               aria-label="Toggle theme"
             >
+              {/* Swap icons depending on current mode */}
               {isDarkMode ? (
                 <Sun size={20} className="text-gray-600" />
               ) : (
@@ -297,7 +363,7 @@ export default function Header() {
               )}
             </motion.button>
 
-            {/* Profile Menu (Desktop) */}
+            {/* Profile Dropdown Component (Desktop only) */}
             <div className="hidden sm:block">
               <UserAvatarMenu
                 initials={initials}
@@ -308,7 +374,7 @@ export default function Header() {
               />
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Hamburger Menu Button (Only shows on small screens) */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
@@ -316,22 +382,26 @@ export default function Header() {
               className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition"
               aria-label="Toggle menu"
             >
+              {/* Show X if open, Hamburger if closed */}
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </motion.button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* ==========================================
+            MOBILE MENU DROPDOWN PANEL 
+            ========================================== */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.nav
               ref={mobileMenuRef}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              initial={{ opacity: 0, height: 0 }} // Starts invisible with 0 height
+              animate={{ opacity: 1, height: "auto" }} // Slides down smoothly
+              exit={{ opacity: 0, height: 0 }} // Slides up smoothly when closed
               transition={{ duration: 0.2 }}
               className="lg:hidden mt-4 space-y-2 border-t border-gray-100 pt-4"
             >
+              {/* Render the standard navigation links */}
               {currentNavLinks.map(({ name, href, icon: Icon }) => (
                 <Link
                   key={href}
@@ -340,14 +410,14 @@ export default function Header() {
                     ? "bg-indigo-50 text-indigo-600"
                     : "text-gray-700 hover:bg-gray-50"
                     }`}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => setMobileMenuOpen(false)} // Close menu when a link is clicked
                 >
                   <Icon size={18} />
                   {name}
                 </Link>
               ))}
 
-              {/* Mobile Profile Section */}
+              {/* Mobile Profile Section Links (Settings & Logout) */}
               <div className="border-t border-gray-100 pt-4 mt-4">
                 <Link
                   href={`/${userRole}/profile`}
@@ -365,10 +435,11 @@ export default function Header() {
                   <Settings size={18} />
                   Settings
                 </Link>
+                {/* Mobile Logout Button */}
                 <button
                   onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
+                    handleLogout(); // Call logout logic
+                    setMobileMenuOpen(false); // Close the mobile menu
                   }}
                   className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm text-rose-600 hover:bg-rose-50"
                 >

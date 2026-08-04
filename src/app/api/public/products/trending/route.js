@@ -1,19 +1,25 @@
+// Import Next.js tool for sending responses
 import { NextResponse } from 'next/server';
+// Import the database tool
 import db from '@/lib/db';
 
 /**
- * @file route.js
- * @description Trending Products API.
- * Fetches the 10 most recent active products to display as "Trending" on the home page.
+ * File: route.js
+ * Location: src/app/api/public/products/trending/route.js
+ * Description: Trending Products API.
+ * This route fetches 10 products to display as "Trending Now" on the main home page. 
+ * Because it is on the public home page, no login token is required to use this route.
  */
 
 // ==========================================
-// GET HANDLER: Handles GET requests for src/app/api/public/products/trending/route.js
+// GET HANDLER: Fetch trending products
 // ==========================================
 export async function GET(request) {
     try {
-        // Fetch active vendor products, ordered by newest first (as a proxy for trending for now)
-        // In a real app, you might sort by sales count or views.
+        // Step 1: Fetch active products from the database
+        // For right now, "Trending" just means "The 10 newest products".
+        // We use ORDER BY created_at DESC to sort newest-first, and LIMIT 10 to stop at 10 items.
+        // In a real, massive app, this might be based on sales numbers or click counts instead.
         const [products] = await db.query(`
             SELECT id, name, price, stock, category, image, status, created_at, average_rating, total_reviews
             FROM vendor_products
@@ -22,20 +28,26 @@ export async function GET(request) {
             LIMIT 10
         `);
 
-        // Format price and image if needed
+        // Step 2: Format the data perfectly for the frontend UI
         const formatted = products.map(p => ({
             ...p,
             price: Number(p.price),
-            // Ensure image URL is absolute or valid
+            // Ensure the image URL is valid. If a vendor forgot to upload a picture, 
+            // we provide a placeholder image of a jacket so the website doesn't look broken.
             image: p.image || '/assets/placeholder-jacket.png'
         }));
 
+        // Step 3: Send the list back to the browser
+        // We use Cache-Control headers to tell the browser NOT to cache this result, 
+        // so the home page always shows the absolute newest items.
         return NextResponse.json(formatted, {
             headers: {
                 'Cache-Control': 'no-store, max-age=0'
             }
         });
+        
     } catch (error) {
+        // Log crashes safely
         console.error("Failed to fetch trending products:", error);
         return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
     }

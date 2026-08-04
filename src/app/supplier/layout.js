@@ -112,6 +112,7 @@ export default function SupplierLayout({ children }) {
            <nav className="space-y-1.5 flex-1 overflow-y-auto scrollbar-hide pr-1">
              {navItems.map((item) => {
                const isActive = pathname === item.href;
+               const Icon = item.icon;
                return (
                  <Link
                    key={item.name}
@@ -125,7 +126,7 @@ export default function SupplierLayout({ children }) {
                      }`}
                    title={isCollapsed ? item.name : ""}
                  >
-                   <item.icon size={18} className={`flex-shrink-0 ${isActive ? "text-white" : "text-slate-600 group-hover:text-[#F97316]"}`} />
+                   <Icon size={18} className={`flex-shrink-0 ${isActive ? "text-white" : "text-slate-600 group-hover:text-[#F97316]"}`} />
                    {!isCollapsed && <span className="animate-fade-in whitespace-nowrap">{item.name}</span>}
                    
                    {/* Badge */}
