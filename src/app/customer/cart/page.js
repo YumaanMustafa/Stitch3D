@@ -32,53 +32,69 @@ import { useCart } from "../../context/CartContext";
  * Calculates subtotal and checkout readiness.
  */
 
-const SHIPPING_FEE = 500; // PKR
-const FREE_SHIPPING_THRESHOLD = 5000; // PKR
+// Define standard fees used on this page
+const SHIPPING_FEE = 500; // Shipping cost in PKR (Pakistani Rupees)
+const FREE_SHIPPING_THRESHOLD = 5000; // Spend this much to get free shipping
 
 export default function CartPage() {
+  // Navigation tool
   const router = useRouter();
+  // Pull variables and functions from the global Cart Context (state manager)
   const { cartItems, removeFromCart, updateQuantity, isLoading } = useCart();
+  // Notification tool to show popups
   const { showToast } = useToast();
+  
+  // State to manage whether the "Are you sure you want to delete?" popup is open
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  // State to remember WHICH item the user is trying to delete
   const [itemToDelete, setItemToDelete] = useState(null);
 
   /* ================= CALCULATIONS ================= */
 
+  // Calculate the total cost of all items in the cart before shipping
+  // useMemo ensures this math only runs when the cart items actually change, saving processing power
   const subtotal = useMemo(
     () =>
+      // The reduce function loops over all cart items and keeps a running total (acc)
       cartItems.reduce((acc, item) => {
-        const price = Number(item.price) || 0;
-        const qty = Number(item.quantity) || 1;
-        return acc + price * qty;
+        const price = Number(item.price) || 0; // Ensure price is a number
+        const qty = Number(item.quantity) || 1; // Ensure quantity is a number
+        return acc + price * qty; // Add this item's total to the running total
       }, 0),
-    [cartItems]
+    [cartItems] // Dependency array: only recalculate if cartItems changes
   );
 
+  // If the subtotal is higher than the threshold, shipping is 0, otherwise apply the standard fee
   const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  // Final total to pay
   const total = subtotal + shippingFee;
 
   /* ================= HANDLERS ================= */
 
+  // Function called when user clicks the + or - buttons to change item quantity
   const handleUpdateQuantity = (id, qty) => {
     updateQuantity(id, qty);
   };
 
+  // Function called when the user clicks the trash can icon
   const handleRemoveItem = (id) => {
-    setItemToDelete(id);
-    setIsDeleteModalOpen(true);
+    setItemToDelete(id); // Remember which item they clicked
+    setIsDeleteModalOpen(true); // Open the confirmation popup
   };
 
+  // Function called when the user clicks "Remove" inside the confirmation popup
   const confirmDelete = () => {
     if (itemToDelete) {
-      removeFromCart(itemToDelete);
-      showToast("Item removed from cart", "success");
-      setIsDeleteModalOpen(false);
-      setItemToDelete(null);
+      removeFromCart(itemToDelete); // Tell the global context to delete the item
+      showToast("Item removed from cart", "success"); // Show success message
+      setIsDeleteModalOpen(false); // Close popup
+      setItemToDelete(null); // Clear remembered item
     }
   };
 
   /* ================= LOADING STATE ================= */
 
+  // If the cart is still loading data from the server or local storage, show a spinner
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">

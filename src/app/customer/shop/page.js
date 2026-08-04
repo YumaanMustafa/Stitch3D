@@ -14,40 +14,57 @@ import Button from "@/app/components/ui/Button";
  */
 
 export default function ShopPage() {
+    // Tool used to navigate between pages (like clicking a link)
     const router = useRouter();
+    
+    // State to hold the full list of products fetched from the database
     const [products, setProducts] = useState([]);
+    // State to track if the page is currently loading data
     const [loading, setLoading] = useState(true);
+    // State to store whatever the user types into the search bar
     const [search, setSearch] = useState("");
+    // State to store which category button the user clicked (e.g., "Jackets", "Bags")
     const [filter, setFilter] = useState("All");
 
+    // This effect runs once when the page first loads
     useEffect(() => {
+        // Asynchronous function to fetch products from the server
         const fetchProducts = async () => {
-            setLoading(true);
+            setLoading(true); // Start showing the loading spinner
             try {
-                // Fetch all products once for instant client-side filtering
+                // Fetch all public products
                 const res = await fetch(`/api/public/products`);
                 const data = await res.json();
+                // Check if the data is a list (array) and save it to the state
                 setProducts(Array.isArray(data) ? data : []);
             } catch (err) {
+                // Log any errors to the console if the fetch fails
                 console.error(err);
             } finally {
+                // Stop the loading spinner whether it succeeded or failed
                 setLoading(false);
             }
         };
-        fetchProducts();
-    }, []);
+        fetchProducts(); // Execute the function
+    }, []); // Empty array means this only runs once
 
+    // Calculate a new list of products that match the search text AND the selected category
     const filteredProducts = products.filter(p => {
+        // Check if the product name, category, or description contains the search text (ignoring case)
         const matchesSearch = !search ||
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             (p.category && p.category.toLowerCase().includes(search.toLowerCase())) ||
             (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
 
+        // Check if the product matches the selected category filter, or if "All" is selected
         const matchesCategory = filter === "All" || p.category === filter;
 
+        // Keep the product only if it matches BOTH conditions
         return matchesSearch && matchesCategory;
     });
 
+    // Create a unique list of category names based on the products we received
+    // `new Set` removes duplicates, so we only have one button per category
     const categories = ["All", ...new Set(products.map(p => p.category))].slice(0, 6);
 
     return (

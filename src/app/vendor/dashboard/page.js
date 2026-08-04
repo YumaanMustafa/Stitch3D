@@ -13,9 +13,11 @@ import {
 /**
  * @file page.js
  * @description Vendor Dashboard - Simplified Text & Modern Light Theme.
+ * This is the main landing page for vendors after they log in.
  */
 
 export default function VendorDashboard() {
+   // State variable to hold the statistics shown at the top of the dashboard
    const [stats, setStats] = useState({
       totalSales: "0",
       activeOrders: 0,
@@ -23,40 +25,55 @@ export default function VendorDashboard() {
       revenue: "0",
       growth: "+12.5%"
    });
+   // State variable to track whether data is still loading from the server
    const [loading, setLoading] = useState(true);
+   // State variable to store today's date formatted nicely as a string
    const [todayStr, setTodayStr] = useState("June 09, 2026");
 
+   // This effect runs once when the dashboard first loads
    useEffect(() => {
       try {
+         // Format the current date using the standard browser date formatter
          const formatter = new Intl.DateTimeFormat("en-US", {
-            timeZone: "America/Los_Angeles",
+            timeZone: "America/Los_Angeles", // Display in PST timezone
             month: "long",
             day: "2-digit",
             year: "numeric"
          });
+         // Update the state variable with today's formatted date
          setTodayStr(formatter.format(new Date()));
       } catch (e) {
          console.error("Failed to format date in PST:", e);
       }
 
+      // Asynchronous function to fetch vendor statistics from the backend database
       const fetchData = async () => {
          try {
+            // Get the vendor's secure token from local browser storage
             const token = localStorage.getItem("vendorToken");
+            // Call the vendor dashboard stats API endpoint, passing the secure token
             const res = await fetch("/api/vendor/dashboard/stats", {
                headers: { Authorization: `Bearer ${token}` }
             });
+            
+            // If the server responds with a success status (200 OK)
             if (res.ok) {
+               // Convert the response to JSON and update the stats state
                const data = await res.json();
                setStats(data);
             }
          } catch (err) {
+            // If there's a network error, log it to the console
             console.error("Fetch error:", err);
          } finally {
+            // Stop the loading animation regardless of success or failure
             setLoading(false);
          }
       };
+      
+      // Execute the fetch function we just defined
       fetchData();
-   }, []);
+   }, []); // The empty array [] means this effect only runs once on load
 
    const chartData = [
       { name: "MON", value: 400 },

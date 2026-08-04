@@ -26,46 +26,62 @@ import Image from "next/image";
  */
 
 export default function Dashboard() {
+  // Tool used to navigate the user to other pages (like /customer/shop)
   const router = useRouter();
+  
+  // State variable to store the customer's first name, defaulting to "Designer"
   const [firstName, setFirstName] = useState("Designer");
 
+  // This effect runs once when the page loads to fetch the user's name
   useEffect(() => {
+    // Get the login token from the browser's storage
     const token = localStorage.getItem("token");
     if (token) {
+      // Call the profile API to get the user's details
       fetch("/api/auth/profile", {
         headers: { Authorization: `Bearer ${token}` }
       }).then(res => res.json()).then(data => {
+        // If the API returns a name, update the state variable
         if (data.first_name || data.firstName) setFirstName(data.first_name || data.firstName);
       }).catch(err => console.error(err));
     }
   }, []);
 
   /* ===== Context ===== */
+  // Get functions from the global cart and toast context to manage shopping
   const { addToCart } = useCart();
   const { showToast } = useToast();
 
+  // Function that runs when the user clicks "Add to Cart" on a trending jacket
   const handleAddToCart = (jacket) => {
+    // Call the global context function to add the item
     addToCart({
       id: jacket.id,
       title: jacket.title,
       img: jacket.img,
+      // Remove any non-number characters from the price (like "Rs.")
       price: String(jacket.price).replace(/[^\d]/g, ""),
       quantity: 1,
     });
 
+    // Show a success popup message at the bottom of the screen
     showToast(`✓ ${jacket.title} added to cart`, "success");
   };
 
   /* ===== Trending State ===== */
+  // State variables for the trending jackets section
   const [trendingJackets, setTrendingJackets] = useState([]);
   const [loadingTrending, setLoadingTrending] = useState(true);
 
+  // This effect fetches the popular jackets when the page loads
   useEffect(() => {
-    setLoadingTrending(true);
+    setLoadingTrending(true); // Start the loading spinner
     fetch('/api/public/products/trending')
       .then(res => res.json())
       .then(data => {
+        // If the data is an array of products, format it for the UI
         if (Array.isArray(data)) {
+          // Loop over each product and create a new formatted object
           setTrendingJackets(data.map(p => ({
             id: p.id,
             title: p.name,
@@ -79,10 +95,12 @@ export default function Dashboard() {
         }
       })
       .catch(e => console.error(e))
+      // Stop the loading spinner whether it succeeded or failed
       .finally(() => setLoadingTrending(false));
   }, []);
 
   /* ===== Stats State ===== */
+  // State variable to store the 4 main statistics shown at the top of the dashboard
   const [statsData, setStatsData] = useState({
     orders: 0,
     inProgress: 0,
@@ -90,15 +108,18 @@ export default function Dashboard() {
     spent: 0
   });
 
+  // This effect fetches the user's order history and saved designs to calculate stats
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!token) return; // Stop if not logged in
 
     const fetchData = async () => {
       try {
+        // 1. Fetch all orders for this customer
         const ordersRes = await fetch('/api/customer/orders/my', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
         let ordersCount = 0;
         let inProgressCount = 0;
         let totalSpent = 0;
@@ -106,23 +127,28 @@ export default function Dashboard() {
         if (ordersRes.ok) {
           const orders = await ordersRes.json();
           if (Array.isArray(orders)) {
-            ordersCount = orders.length;
+            ordersCount = orders.length; // Count total orders
+            // Filter the array to find only orders that are still pending or in progress
             inProgressCount = orders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
+            // Calculate total money spent using the reduce function
             totalSpent = orders.reduce((sum, o) => sum + Number(o.total), 0);
           }
         }
 
+        // 2. Fetch all saved custom designs for this customer
         const designsRes = await fetch('/api/customer/designs', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
         let designsCount = 0;
         if (designsRes.ok) {
           const designs = await designsRes.json();
           if (Array.isArray(designs)) {
-            designsCount = designs.length;
+            designsCount = designs.length; // Count total saved designs
           }
         }
 
+        // 3. Update the state with the final calculated numbers
         setStatsData({
           orders: ordersCount,
           inProgress: inProgressCount,
@@ -135,9 +161,10 @@ export default function Dashboard() {
       }
     };
 
-    fetchData();
+    fetchData(); // Run the async function
   }, []);
 
+  // Format the stats data into an array of objects to easily map them into UI cards later
   const stats = [
     { label: "Total Orders", value: statsData.orders.toString(), icon: Package, growth: "+2%", color: "brand" },
     { label: "Active Orders", value: statsData.inProgress.toString(), icon: Clock, growth: "on track", color: "blue" },
