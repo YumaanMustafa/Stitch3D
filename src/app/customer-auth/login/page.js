@@ -180,7 +180,12 @@ export default function Login() {
               disabled={isSubmitting || loading}
               className="w-full py-4 bg-[var(--color-brand)] hover:bg-[var(--color-brand-hover)] text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
             >
-              {isSubmitting || loading ? "Signing in..." : "Log In"}
+              {isSubmitting || loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Signing in...
+                </span>
+              ) : "Log In"}
             </button>
 
             {status && status.message && (

@@ -20,6 +20,7 @@ export default function VendorLogin() {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoreEmail, setRestoreEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (values, { setSubmitting }) => {
     setServerMessage("");
@@ -34,6 +35,7 @@ export default function VendorLogin() {
       if (res.ok) {
         localStorage.setItem("vendorToken", data.token);
         setIsSuccess(true);
+        setLoading(true);
         setServerMessage("Login successful! Redirecting...");
         setTimeout(() => router.push("/vendor/dashboard"), 1000);
       } else {
@@ -132,10 +134,15 @@ export default function VendorLogin() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || loading}
                   className="w-full py-4 bg-[#F97316] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-[#EA580C] transition-all shadow-xl shadow-[#F97316]/20 disabled:opacity-50"
                 >
-                  {isSubmitting ? "Signing in..." : "Sign In"}
+                  {isSubmitting || loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Signing in...
+                    </span>
+                  ) : "Sign In"}
                 </button>
 
                 {/* Server Messages */}
