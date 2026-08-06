@@ -22,15 +22,31 @@ import ConfirmationModal from "@/app/components/ConfirmationModal";
 import { motion, AnimatePresence } from "framer-motion";
 import NotificationBell from "@/app/components/NotificationBell";
 
+/**
+ * @file layout.js
+ * @description Admin Layout - Professional Dashboard Interface.
+ * This file acts as the main wrapper for all admin pages. It provides the sidebar menu 
+ * and the top navigation bar across all admin screens.
+ */
+
 export default function AdminLayout({ children }) {
+  // State to manage whether the sidebar is collapsed (thin) or expanded (wide)
   const [collapsed, setCollapsed] = useState(false);
+  // State to store the currently logged-in admin's profile data
   const [admin, setAdmin] = useState(null);
+  // State to track if we are still verifying the admin's login status
   const [loadingComponent, setLoadingComponent] = useState(true);
+  // State to control whether the logout confirmation popup is visible
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  // State to control a popup explaining that certain features (like Suppliers) are locked for now
   const [isLockedModalOpen, setIsLockedModalOpen] = useState(false);
+  
+  // Tool to get the current page URL path so we can highlight the active menu item
   const pathname = usePathname();
+  // Tool to navigate the user to different pages programmatically
   const router = useRouter();
 
+  // The list of links that appear in the admin sidebar menu
   const menuItems = [
     { name: "Dashboard", icon: <BarChart2 size={20} />, path: "/admin/dashboard" },
     { name: "Users", icon: <Users size={20} />, path: "/admin/users" },
@@ -39,7 +55,7 @@ export default function AdminLayout({ children }) {
       name: "Suppliers",
       icon: <Factory size={20} />,
       path: "/admin/suppliers",
-      isLocked: false
+      isLocked: false // Indicates if this feature is currently disabled
     },
     { name: "Complaints", icon: <FileText size={20} />, path: "/admin/complaints" },
     { name: "Settings", icon: <Settings size={20} />, path: "/admin/settings" },
@@ -47,20 +63,25 @@ export default function AdminLayout({ children }) {
 
   // 🔹 Fetch admin info when logged in
   useEffect(() => {
+    // Function to check if the admin is logged in and fetch their details
     const fetchProfile = async () => {
+      // Check if the admin token exists in the browser's storage
       const token = localStorage.getItem("adminToken");
       if (!token) {
         console.warn("No admin token found, redirecting to login.");
+        // If no token, redirect to the login page immediately
         router.push("/admin-login");
-        setLoadingComponent(false);
+        setLoadingComponent(false); // Stop the loading spinner
         return;
       }
 
       try {
+        // Ask the server for the admin's profile data using the token
         const res = await fetch("/api/admin/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+        // If the server says the token is invalid (401 or 403), throw an error
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
             throw new Error("Unauthorized");
@@ -68,28 +89,35 @@ export default function AdminLayout({ children }) {
           throw new Error(`Request failed with status ${res.status}`);
         }
 
+        // Convert the server response into a JavaScript object
         const data = await res.json();
         if (data && data.email) {
+          // If valid data is returned, save it to the state
           setAdmin(data);
         } else {
           throw new Error("Invalid profile data received");
         }
       } catch (err) {
         console.error("Admin Profile Fetch Error:", err);
+        // If anything went wrong (like token expired), clear storage and force login
         localStorage.removeItem("adminToken");
         router.push("/admin-login");
       } finally {
+        // Always stop the loading spinner, whether success or failure
         setLoadingComponent(false);
       }
     };
 
-    fetchProfile();
+    fetchProfile(); // Execute the function when the component loads
   }, [router]);
 
+  // Function called when the admin clicks the logout button
   const handleLogout = () => {
+    // Erase all admin-related data from the browser
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminName");
     localStorage.removeItem("adminEmail");
+    // Send them back to the login page
     router.push("/admin-login");
   };
 

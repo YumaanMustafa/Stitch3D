@@ -11,49 +11,68 @@ import NotificationBell from "@/app/components/NotificationBell";
 /**
  * @file layout.js
  * @description Supplier Layout - 2-Tone Professional Design (Midnight Sidebar & Orange Accents).
+ * This file acts as the main wrapper for all supplier pages. It provides the sidebar menu 
+ * and the top navigation bar across all supplier screens.
  */
 
 export default function SupplierLayout({ children }) {
+  // State to manage whether the mobile sidebar is open or closed
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // State to manage whether the desktop sidebar is collapsed (thin) or expanded (wide)
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Tool to get the current page URL path so we can highlight the active menu item
   const pathname = usePathname();
+  // Tool to navigate the user to different pages programmatically
   const router = useRouter();
-  const [userInitial, setUserInitial] = useState("S");
-  const [supplierName, setSupplierName] = useState("");
+  
+  // State variables for storing supplier profile info
+  const [userInitial, setUserInitial] = useState("S"); // Used for the avatar circle
+  const [supplierName, setSupplierName] = useState(""); // Displayed in header
+  // State to control whether the logout confirmation popup is visible
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  // State to track notification counts (like unread messages) for the sidebar badges
   const [unreadCounts, setUnreadCounts] = useState({
     messages: 0,
     requests: 0,
     inventory: 0
   });
 
+  // Effect runs when the layout loads to check login status and load initial data
   useEffect(() => {
+    // Check if the user is logged in by looking for their token
     const token = localStorage.getItem("supplierToken");
     if (!token) {
+      // If no token is found, kick them back to the login screen
       router.push("/supplier-auth/login");
       return;
     }
     
-    // Fetch profile from role-specific settings
+    // Fetch profile details (like their name) from the backend API
     fetch("/api/supplier/settings", {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => {
+        // If we get a name back, update our state variables
         if (data.name) {
           setSupplierName(data.name);
+          // Set avatar initial to the first letter of their name
           setUserInitial(data.name.charAt(0).toUpperCase());
         }
       })
       .catch(() => {});
 
+    // Function to check how many unread notifications this supplier has
     const checkUnread = async () => {
       try {
         if (!token) return;
         const resN = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
         if (resN.ok) {
           const notifs = await resN.json();
+          // Filter out only the notifications that are marked "unread" (is_read = false)
           const unread = notifs.filter(n => !n.is_read);
+          // Update our unread counts based on the 'type' of notification
           setUnreadCounts({
             messages: unread.filter(n => n.type === 'message').length,
             requests: unread.filter(n => n.type === 'request' || n.type === 'order').length,
@@ -62,16 +81,24 @@ export default function SupplierLayout({ children }) {
         }
       } catch { }
     };
+    
+    // Check for unread notifications immediately
     checkUnread();
+    // Then set up a timer to check again every 10 seconds (10000ms)
     const interval = setInterval(checkUnread, 10000);
+    // Cleanup function to clear the timer if the user leaves this layout
     return () => clearInterval(interval);
   }, [router]);
 
+  // Function called when user confirms they want to log out
   const handleLogout = () => {
+    // Remove their token from browser storage so they are no longer logged in
     localStorage.removeItem("supplierToken");
+    // Send them back to the login page
     router.push("/supplier-auth/login");
   };
 
+  // The list of links that appear in the sidebar menu
   const navItems = [
     { name: "Dashboard", href: "/supplier/dashboard", icon: LayoutDashboard },
     { name: "Requests", href: "/supplier/vendor-requests", icon: Truck },

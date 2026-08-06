@@ -24,11 +24,21 @@ import Footer from "@/app/components/AppFooter";
 import { useCart } from "@/app/context/CartContext";
 import { ToastProvider } from "@/app/context/ToastContext";
 
+/**
+ * @file layout.js
+ * @description Customer Layout - Main Storefront Navigation.
+ * This is the wrapper around the main shopping areas. It includes the top navigation bar, 
+ * the mobile menu, the side panel for quick access, and manages the user's global session.
+ */
+
+// Helper function to safely extract the user's ID from their secure login token
 const getUserIdFromToken = () => {
+    // Make sure we are in the browser before trying to read storage
     if (typeof window === 'undefined') return null;
     const token = localStorage.getItem("token");
-    if (!token) return null;
+    if (!token) return null; // Not logged in
     try {
+        // A standard trick to decode the middle part of a JWT token which holds the data
         const payload = JSON.parse(atob(token.split('.')[1]));
         return payload.id || payload.userId;
     } catch (e) {
@@ -37,16 +47,30 @@ const getUserIdFromToken = () => {
 };
 
 export default function CustomerLayout({ children }) {
+    // Navigation tool
     const router = useRouter();
+    // Tells us what page the user is currently on (like "/customer/shop")
     const pathname = usePathname();
-    const { cartCount } = useCart(); // Use Global Cart Context
+    
+    // Pull the total number of items in the cart from our global Cart state
+    const { cartCount } = useCart();
+    
+    // State to store the user's basic profile details (Name, Email)
     const [profile, setProfile] = useState(null);
+    // State to track if the little profile dropdown menu is open
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    // State to track if the full-screen mobile menu is open
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    // Track if we are still fetching data when the page loads
     const [loading, setLoading] = useState(true);
+    // Track if the "Are you sure you want to log out" popup is visible
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    // Track how many unread messages the user has from support/suppliers
     const [unreadCount, setUnreadCount] = useState(0);
+    // Helps fix some weird React errors that happen before the component fully loads
     const [mounted, setMounted] = useState(false);
+    
+    // A reference used to detect if the user clicked outside the profile dropdown menu
     const menuRef = useRef(null);
 
     useEffect(() => {
