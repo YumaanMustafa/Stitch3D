@@ -38,6 +38,9 @@ async function getSupplierFromToken(request) {
 export async function GET(request) {
     try {
         // Step 1: Security Check. Verify they are logged in as a supplier.
+        // PRIVILEGE 1: Warehouse Isolation
+        // Suppliers can only view and manage their own inventory items.
+        // We use the decoded token to identify their exact supplier_id.
         const supplier = await getSupplierFromToken(request);
         if (!supplier) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

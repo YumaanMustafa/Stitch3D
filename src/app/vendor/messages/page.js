@@ -34,6 +34,9 @@ export default function VendorMessagesPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // PRIVILEGE 1: Secure Direct Messaging
+    // Vendors can only fetch conversations that belong to their business.
+    // The backend uses their vendorToken to ensure they cannot read other vendors' messages.
     const fetchContacts = async () => {
         const token = localStorage.getItem("vendorToken");
         try {

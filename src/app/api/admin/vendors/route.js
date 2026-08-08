@@ -24,6 +24,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
     try {
         // Step 1: Security Check. Ensure the person asking is an Admin.
+        // PRIVILEGE: Global Vendor Directory Access
+        // Only Admins have the global privilege to fetch the entire vendor directory 
+        // or manually bypass standard registration.
         const admin = getUserFromRequest(request);
         if (admin.role !== 'admin') {
             return NextResponse.json({ error: "Unauthorized" }, { status: 403 });

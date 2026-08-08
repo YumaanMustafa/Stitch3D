@@ -38,55 +38,76 @@ export default function SupplierLayout({ children }) {
     inventory: 0
   });
 
-  // Effect runs when the layout loads to check login status and load initial data
+  // This effect runs automatically when the layout loads to check login status and load initial data
   useEffect(() => {
-    // Check if the user is logged in by looking for their token
+    // STEP 1: Verify Supplier Identity
+    // We look for a special "supplierToken" in local storage. This is the supplier's digital ID card.
     const token = localStorage.getItem("supplierToken");
     if (!token) {
-      // If no token is found, kick them back to the login screen
+      // If no token is found, they are not logged in. We kick them back to the login screen immediately.
       router.push("/supplier-auth/login");
       return;
     }
     
-    // Fetch profile details (like their name) from the backend API
+    // STEP 2: Fetch Supplier Profile Details
+    // We send a request to our backend API to get this specific supplier's data (like their company name)
     fetch("/api/supplier/settings", {
+      // We attach the token in the headers so the server knows exactly who is asking
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(res => res.ok ? res.json() : Promise.reject()) // If successful, convert to JSON. If not, reject the promise.
       .then(data => {
-        // If we get a name back, update our state variables
+        // If we successfully get the supplier's name back, we update our React state variables
         if (data.name) {
-          setSupplierName(data.name);
-          // Set avatar initial to the first letter of their name
+          setSupplierName(data.name); // This updates the name shown in the top header bar
+          // We set the avatar initial to the first letter of their name, converted to uppercase
           setUserInitial(data.name.charAt(0).toUpperCase());
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // If the fetch fails (e.g., bad internet), we just silently fail and keep default values
+      });
 
-    // Function to check how many unread notifications this supplier has
+    // STEP 3: Check for Unread Notifications
+    // We define an asynchronous function that checks if this supplier has any new alerts (messages, orders, etc.)
     const checkUnread = async () => {
       try {
-        if (!token) return;
+        if (!token) return; // Safety check
+        // Ask the backend for all notifications belonging to this supplier
         const resN = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
+        
         if (resN.ok) {
           const notifs = await resN.json();
-          // Filter out only the notifications that are marked "unread" (is_read = false)
+          // Filter the list to only include notifications that have NOT been read yet
           const unread = notifs.filter(n => !n.is_read);
-          // Update our unread counts based on the 'type' of notification
+          
+          // We update our `unreadCounts` state by categorizing the unread notifications
+          // This allows us to put red number badges next to the correct menu items in the sidebar!
           setUnreadCounts({
+            // Count how many are chat messages
             messages: unread.filter(n => n.type === 'message').length,
+            // Count how many are new custom requests or official orders
             requests: unread.filter(n => n.type === 'request' || n.type === 'order').length,
+            // Count how many are inventory alerts (like low stock)
             inventory: unread.filter(n => n.type === 'inventory').length
           });
         }
-      } catch { }
+      } catch { 
+        // Silently ignore errors to prevent spamming the console
+      }
     };
     
-    // Check for unread notifications immediately
+    // Check for unread notifications immediately when the page loads
     checkUnread();
-    // Then set up a timer to check again every 10 seconds (10000ms)
+    
+    // STEP 4: Set up Polling
+    // We create a background timer that automatically runs the `checkUnread` function every 10 seconds (10,000 milliseconds).
+    // This makes the notification badges update in "real-time" without the user having to refresh the page.
     const interval = setInterval(checkUnread, 10000);
-    // Cleanup function to clear the timer if the user leaves this layout
+    
+    // STEP 5: Cleanup
+    // When the user leaves this layout, React will run this return function.
+    // We clear the timer so it doesn't keep running in the background and wasting computer memory.
     return () => clearInterval(interval);
   }, [router]);
 

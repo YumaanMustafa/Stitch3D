@@ -11,8 +11,9 @@ import { ArrowLeft, ShieldCheck } from "lucide-react";
 /**
  * File: B2BAuthLayout.js
  * Description: Layout used by Vendor and Supplier authentication pages.
- * Uses a bold industrial aesthetic with a dark left panel and white form on the right.
- * B2B stands for Business-to-Business, meaning this layout is for professional users.
+ * PRIVILEGE CONTEXT: This layout is specifically for Business-to-Business (B2B) 
+ * users (Vendors & Suppliers) who have elevated privileges compared to standard customers.
+ * It uses a bold industrial aesthetic to differentiate the professional portal.
  */
 
 // B2BAuthLayout wraps authentication pages for business users (vendors and suppliers)

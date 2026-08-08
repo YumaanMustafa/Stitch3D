@@ -46,7 +46,9 @@ export default function VendorDashboard() {
          console.error("Failed to format date in PST:", e);
       }
 
-      // Asynchronous function to fetch vendor statistics from the backend database
+      // PRIVILEGE 1: Vendor-Specific Analytics
+      // Vendors only see stats for their own store (their revenue, their products, their orders).
+      // They do not have the Admin privilege to see the entire platform's data.
       const fetchData = async () => {
          try {
             // Get the vendor's secure token from local browser storage

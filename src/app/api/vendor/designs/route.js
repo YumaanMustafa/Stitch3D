@@ -22,6 +22,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
     try {
         // Step 1: Security Check. Find out who is making this request.
+        // PRIVILEGE: Design Privacy
+        // Only vendors can view custom design requests.
+        // Furthermore, the database query filters by their specific vendor ID 
+        // to ensure they only see designs explicitly sent to their shop.
         const vendor = getUserFromRequest(request);
         
         // If they are not logged in as a vendor, kick them out

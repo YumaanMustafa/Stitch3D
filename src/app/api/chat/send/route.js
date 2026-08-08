@@ -19,6 +19,9 @@ import { getChatUserId } from '../auth';
 export async function POST(request) {
     try {
         // Step 1: Security Check. Verify who is trying to send this message.
+        // PRIVILEGE: Cross-Role Messaging
+        // Customers, Vendors, and Suppliers can all use this endpoint.
+        // The token is rigorously checked so the sender_id cannot be spoofed.
         const userId = await getChatUserId(request);
         
         // If they aren't logged in, stop them immediately

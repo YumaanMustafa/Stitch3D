@@ -27,6 +27,9 @@ export default function AdminLogin() {
     setStatus(null);
 
     try {
+      // PRIVILEGE: Admin Authentication
+      // Authenticates an administrator and returns a secure adminToken.
+      // This token is strictly checked on all /api/admin/* routes to prevent unauthorized access.
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

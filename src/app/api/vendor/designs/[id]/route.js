@@ -45,7 +45,7 @@ export async function GET(request, { params }) {
         // We include 'vendor_id = ?' to make absolutely sure they can't snoop on 
         // designs assigned to a completely different vendor!
         const [rows] = await db.query(
-            "SELECT id, name, color, material, views, snapshots FROM customized_designs WHERE id = ? AND vendor_id = ?",
+            "SELECT id, name, color, material, size, views, snapshots FROM customized_designs WHERE id = ? AND vendor_id = ?",
             [id, vendorId]
         );
 
@@ -62,6 +62,7 @@ export async function GET(request, { params }) {
             title: rows[0].name,
             color: rows[0].color,
             material: rows[0].material,
+            size: rows[0].size || null,
             views: rows[0].views ? JSON.parse(rows[0].views) : {},
             snapshots: rows[0].snapshots ? JSON.parse(rows[0].snapshots) : {}
         };

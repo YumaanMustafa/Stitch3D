@@ -30,28 +30,50 @@ export default function DesignsPage() {
     const [itemToDelete, setItemToDelete] = useState(null);
     const router = useRouter();
 
+    // This hook runs automatically as soon as the DesignsPage is opened by the user
     useEffect(() => {
+        // STEP 1: Verify User Identity
+        // We look inside the browser's local storage to see if they have a 'token'
+        // A token is like a digital ID card that proves they are logged in.
         const token = localStorage.getItem("token");
         if (!token) {
-            // Maybe redirect or show empty? 
+            // If they don't have an ID card, we just stop here.
+            // (In a stricter setup, we might redirect them to the login page immediately)
             return;
         }
 
+        // STEP 2: Fetch Saved Designs from the Backend Server
+        // We use the `fetch` function to call our backend API endpoint
         fetch('/api/customer/designs', {
+            // We attach their digital ID card (token) to the request so the server knows who is asking
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => {
+                // STEP 3: Handle the Server's Response
+                // If the server says "401 Unauthorized", it means their ID card is expired or invalid
                 if (res.status === 401) {
+                    // Kick them back to the login screen
                     router.push('/customer-auth/login');
-                    return [];
+                    return []; // Return an empty array so the next step doesn't crash
                 }
+                // If everything is okay, we convert the server's raw response into a readable JSON object
                 return res.json();
             })
             .then(data => {
-                if (Array.isArray(data)) setSavedDesigns(data);
+                // STEP 4: Update the Screen
+                // We check to make sure the server gave us a list (array) of designs
+                if (Array.isArray(data)) {
+                    // We save that list into our React state variable (`savedDesigns`)
+                    // This automatically triggers the screen to redraw and show all their jackets!
+                    setSavedDesigns(data);
+                }
             })
-            .catch(err => console.error("Failed to load designs", err));
-    }, []);
+            .catch(err => {
+                // STEP 5: Error Handling
+                // If anything goes wrong (like the internet disconnects), we log the error so developers can fix it
+                console.error("Failed to load designs", err);
+            });
+    }, []); // The empty array `[]` at the end means "only run this process exactly once when the page first loads"
 
     const [toastMessage, setToastMessage] = useState("");
 
@@ -60,25 +82,44 @@ export default function DesignsPage() {
         setTimeout(() => setToastMessage(""), 3000);
     };
 
+    // This function runs when the user clicks the final "Delete" button inside the red warning popup
     const confirmDelete = () => {
+        // STEP 1: Safety Check
+        // If there is no specific jacket selected to delete, we just stop the function so it doesn't crash.
         if (!itemToDelete) return;
 
+        // STEP 2: Verify User Identity
+        // We grab their digital ID card (token) again
         const token = localStorage.getItem("token");
+        
+        // STEP 3: Talk to the Backend
+        // We use fetch to send a message to the backend. Notice the 'DELETE' method.
+        // We are saying: "Hey server, please DELETE the design with ID = itemToDelete"
         fetch(`/api/customer/designs?id=${itemToDelete}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => res.json())
             .then(data => {
+                // STEP 4: Handle the Server's Reply
                 if (data.success) {
+                    // If the server says "success: true", we remove the jacket from our screen!
+                    // We use `.filter` to create a new list of jackets that DOES NOT include the one we just deleted.
                     setSavedDesigns(prev => prev.filter(d => d.id !== itemToDelete));
 
-                    // SYNC: Remove from Cart if present
+                    // STEP 5: Sync with the Shopping Cart
+                    // If the user had this custom jacket sitting in their shopping cart, 
+                    // we need to remove it from there too so they don't try to buy a deleted jacket.
                     try {
                         const userId = getUserIdFromToken();
+                        // Find their specific cart in local storage
                         const cartKey = userId ? `cart_${userId}` : 'cart';
                         const cart = JSON.parse(localStorage.getItem(cartKey) || '[]');
+                        
+                        // Filter out the deleted design from the cart
                         const updatedCart = cart.filter(c => c.designId !== itemToDelete);
+                        
+                        // If the cart actually changed, we save it and tell the whole website to update the cart icon
                         if (cart.length !== updatedCart.length) {
                             localStorage.setItem(cartKey, JSON.stringify(updatedCart));
                             window.dispatchEvent(new Event('cartUpdated'));
@@ -87,14 +128,22 @@ export default function DesignsPage() {
                         console.error("Cart sync failed", e);
                     }
 
+                    // STEP 6: Clean Up the Screen
+                    // Show a success message to the user
                     showToast("Design deleted permanently");
+                    // Close the red warning popup
                     setIsDeleteModalOpen(false);
+                    // Clear the memory of which item we were looking at
                     setItemToDelete(null);
                 } else {
+                    // If the server says "success: false", we show an error message
                     showToast('Failed to delete design');
                 }
             })
-            .catch(err => console.error("Search failed", err));
+            .catch(err => {
+                // If the internet breaks during the process, we log it for developers
+                console.error("Delete operation failed", err);
+            });
     };
 
     // NO CHANGE NEEDED TO THIS FILE AS IT DOESNT SHOW BADGE

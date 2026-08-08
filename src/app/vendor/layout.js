@@ -46,6 +46,9 @@ export default function VendorLayout({ children }) {
       try {
         if (!token) return;
 
+        // PRIVILEGE 1: Vendor-Specific Notifications
+        // Vendors only receive notifications and unread message counts related to their 
+        // specific store (their customers, their suppliers). Admin-level alerts are not shown here.
         const [resN, resCustMsg, resSuppMsg] = await Promise.all([
           fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } }),
           fetch("/api/chat/unread?filter=customer", { headers: { Authorization: `Bearer ${token}` } }),

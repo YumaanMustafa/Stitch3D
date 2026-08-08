@@ -23,9 +23,12 @@ export default function AdminComplaintsPage() {
 
     const API_URL = "/api/admin/complaints";
 
+    // PRIVILEGE 1: Super View
+    // Only Admins can fetch all support tickets/complaints from every user across the system.
     const fetchComplaints = async () => {
         setLoading(true);
         try {
+            // The backend requires the admin token to grant access to the complaints list
             const token = localStorage.getItem("adminToken");
             const res = await fetch(API_URL, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -50,6 +53,8 @@ export default function AdminComplaintsPage() {
         fetchComplaints();
     }, []);
 
+    // PRIVILEGE 2: Complaint Resolution
+    // Admins have the authority to manage support tickets, marking them as 'reviewed' or 'resolved'.
     const updateStatus = async (id, status) => {
         try {
             const token = localStorage.getItem("adminToken");
@@ -63,8 +68,9 @@ export default function AdminComplaintsPage() {
             });
 
             if (res.ok) {
+                // Instantly update the UI so the admin sees the change immediately
                 setComplaints(complaints.map(c => c.complaint_id === id ? { ...c, status } : c));
-                setSelectedComplaint(null);
+                setSelectedComplaint(null); // Close the popup
             }
         } catch (err) {
             console.error("Status update failed:", err);

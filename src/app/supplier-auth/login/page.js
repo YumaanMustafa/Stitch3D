@@ -13,34 +13,49 @@ const SupplierLoginSchema = Yup.object().shape({
 });
 
 export default function SupplierLogin() {
-  const router = useRouter();
-  const [serverMessage, setServerMessage] = useState("");
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // STEP 1: Setting up State Variables
+  const router = useRouter(); // Tool to navigate between pages (like redirecting after login)
+  const [serverMessage, setServerMessage] = useState(""); // Stores error or success messages from the database
+  const [isSuccess, setIsSuccess] = useState(false); // Helps us color the message box (green for success, red for error)
+  const [showPassword, setShowPassword] = useState(false); // Toggles password visibility (the little eye icon)
+  const [loading, setLoading] = useState(false); // Controls the spinning loading wheel
 
+  // STEP 2: The Login Function
+  // This runs when the user clicks the "Sign In" button after filling out their email and password
   const handleLogin = async (values, { setSubmitting }) => {
+    // Clear any old error messages
     setServerMessage("");
+    
     try {
+      // 2A: Send the email and password to our backend server to check if they match
       const res = await fetch("/api/auth/supplier/login", {
-        method: "POST",
+        method: "POST", // We use POST for sending sensitive data securely
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(values), // Package the email/password as JSON text
       });
+      
       const data = await res.json();
+      
+      // 2B: Handle a Successful Login
       if (res.ok) {
+        // Save the digital ID card (token) to the browser so they stay logged in!
         localStorage.setItem("supplierToken", data.token);
         setIsSuccess(true);
-        setLoading(true);
+        setLoading(true); // Keep the button showing "Signing in..."
         setServerMessage("Login successful! Redirecting...");
+        
+        // Wait 1 second so they can read the success message, then send them to their dashboard
         setTimeout(() => router.push("/supplier/dashboard"), 1000);
       } else {
+        // 2C: Handle a Failed Login (wrong password, unregistered email, etc.)
         setServerMessage(data.message || "Invalid email or password");
         setIsSuccess(false);
       }
     } catch (err) {
+      // 2D: Handle connection errors (e.g., if their wifi drops)
       setServerMessage("Connection error.");
     } finally {
+      // Turn off Formik's internal loading state so they can try again if they failed
       setSubmitting(false);
     }
   };

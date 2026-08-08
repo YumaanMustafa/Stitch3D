@@ -16,10 +16,14 @@ export default function DesignRequests() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // PRIVILEGE 1: Global Design Oversight
+  // Only Admins can fetch all design requests across the entire system, allowing them to monitor 
+  // what customers are requesting and which vendors are handling them.
   const fetchRequests = async () => {
     setLoading(true);
     setError("");
     try {
+      // The admin's unique JWT token is required to authorize this request
       const token = localStorage.getItem("adminToken");
       const res = await fetch("/api/admin/designs", {
         headers: { Authorization: `Bearer ${token}` },

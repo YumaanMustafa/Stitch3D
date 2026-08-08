@@ -36,6 +36,9 @@ export default function VendorSettings() {
     fetchSettings();
   }, []);
 
+  // PRIVILEGE 1: Secure Account Settings
+  // Vendors can only fetch and update their own business profile settings.
+  // The backend uses their vendorToken to ensure they cannot access other vendors' accounts.
   const fetchSettings = async () => {
     try {
       const token = localStorage.getItem("vendorToken");

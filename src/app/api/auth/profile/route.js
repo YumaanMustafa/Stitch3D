@@ -40,6 +40,9 @@ async function findCustomerByUserId(userId) {
 export async function GET(req) {
     try {
         // Step 1: Make sure the user is logged in by checking their token
+        // PRIVILEGE 1: Secure Data Access
+        // Customers (and other users) can only fetch their own profile data.
+        // We use the decoded token to identify their exact user_id securely.
         const userPayload = getUserFromRequest(req);
         
         // Step 2: Fetch their basic info from the database

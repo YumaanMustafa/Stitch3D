@@ -100,7 +100,8 @@ export default function Dashboard() {
   }, []);
 
   /* ===== Stats State ===== */
-  // State variable to store the 4 main statistics shown at the top of the dashboard
+  // State variable to store the 4 main statistics shown at the top of the dashboard.
+  // We initialize them to 0 so the screen doesn't break while we are waiting for the database to reply.
   const [statsData, setStatsData] = useState({
     orders: 0,
     inProgress: 0,
@@ -108,34 +109,47 @@ export default function Dashboard() {
     spent: 0
   });
 
-  // This effect fetches the user's order history and saved designs to calculate stats
+  // This effect fetches the user's order history and saved designs to calculate the dashboard stats.
+  // The empty array [] at the end means "only run this once when the Dashboard first opens."
   useEffect(() => {
+    // 1. Check if they are logged in by looking for their security token
     const token = localStorage.getItem("token");
     if (!token) return; // Stop if not logged in
 
+    // We create an asynchronous function because talking to the database takes time.
+    // It runs in the background so the rest of the website doesn't freeze.
     const fetchData = async () => {
       try {
-        // 1. Fetch all orders for this customer
+        // 2. Fetch all orders for this customer from our backend API
         const ordersRes = await fetch('/api/customer/orders/my', {
+          // We pass the token in the "headers" to prove who we are
           headers: { Authorization: `Bearer ${token}` }
         });
         
+        // We set up temporary counters starting at 0
         let ordersCount = 0;
         let inProgressCount = 0;
         let totalSpent = 0;
 
+        // If the server replies with a success code (like 200 OK)
         if (ordersRes.ok) {
+          // Convert the raw data into a Javascript Array (list)
           const orders = await ordersRes.json();
           if (Array.isArray(orders)) {
-            ordersCount = orders.length; // Count total orders
+            // How many total orders? Just count the length of the list!
+            ordersCount = orders.length; 
+            
             // Filter the array to find only orders that are still pending or in progress
+            // `.filter` creates a new smaller list containing only the items that match the rule
             inProgressCount = orders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
+            
             // Calculate total money spent using the reduce function
+            // `.reduce` loops through every order, taking the `total` price and adding it to the `sum`.
             totalSpent = orders.reduce((sum, o) => sum + Number(o.total), 0);
           }
         }
 
-        // 2. Fetch all saved custom designs for this customer
+        // 3. Fetch all saved custom designs for this customer
         const designsRes = await fetch('/api/customer/designs', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -143,12 +157,14 @@ export default function Dashboard() {
         let designsCount = 0;
         if (designsRes.ok) {
           const designs = await designsRes.json();
+          // If the server gives us a valid list of designs, we count how many there are.
           if (Array.isArray(designs)) {
-            designsCount = designs.length; // Count total saved designs
+            designsCount = designs.length; 
           }
         }
 
-        // 3. Update the state with the final calculated numbers
+        // 4. Update the state with the final calculated numbers
+        // We use `setStatsData` to tell React to redraw the screen with these new numbers!
         setStatsData({
           orders: ordersCount,
           inProgress: inProgressCount,
@@ -157,11 +173,12 @@ export default function Dashboard() {
         });
 
       } catch (e) {
+        // If anything fails (like a bad internet connection), we log the error for developers.
         console.error("Dashboard stats fetch error", e);
       }
     };
 
-    fetchData(); // Run the async function
+    fetchData(); // Run the async function we just defined
   }, []);
 
   // Format the stats data into an array of objects to easily map them into UI cards later

@@ -24,7 +24,11 @@ export default function AdminDashboard() {
   useEffect(() => {
     document.title = "Admin Dashboard | Stitch";
 
+    // PRIVILEGE 1: High-Level Platform Analytics
+    // Admins have access to the dashboard stats API, which aggregates data from all 
+    // users, vendors, and suppliers across the entire system.
     const fetchStats = async () => {
+      // The admin's master token is checked by the server before returning this sensitive data
       const token = localStorage.getItem("adminToken");
       if (!token) {
         setLoading(false);

@@ -36,6 +36,9 @@ export default function VendorProducts() {
         fetchProducts();
     }, []);
 
+    // PRIVILEGE 1: View Own Inventory
+    // Vendors can only fetch the products they created themselves. The backend uses their
+    // token to filter the database so they never see or edit a competitor's products.
     const fetchProducts = async () => {
         try {
             const token = localStorage.getItem("vendorToken");
@@ -53,6 +56,8 @@ export default function VendorProducts() {
         }
     };
 
+    // PRIVILEGE 2: Create & Update Products
+    // Vendors have the authority to add new items to their catalog or change prices and stock.
     const handleSave = async (values, { setSubmitting, resetForm }) => {
         try {
             const token = localStorage.getItem("vendorToken");
@@ -84,6 +89,8 @@ export default function VendorProducts() {
         }
     };
 
+    // PRIVILEGE 3: Remove Products
+    // Vendors can delete their own products from the system entirely.
     const handleDelete = async (id) => {
         setConf({
             open: true,

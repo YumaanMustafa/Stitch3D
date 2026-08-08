@@ -9,46 +9,75 @@ import { motion, AnimatePresence } from "framer-motion";
  */
 
 export default function SupplierMessagesPage() {
+  // STEP 1: Setting up the Page State
+    // These variables hold the data for our screen. 
+    // `contacts` is the list of people we can talk to on the left sidebar.
+    // `messages` is the actual chat history for the currently selected person.
     const [contacts, setContacts] = useState([]);
     const [selectedContact, setSelectedContact] = useState(null);
     const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [sending, setSending] = useState(false);
+    const [newMessage, setNewMessage] = useState(""); // The text box where we type
+    const [loading, setLoading] = useState(true); // Shows a spinner while loading contacts
+    const [sending, setSending] = useState(false); // Disables the 'Send' button while a message is uploading
     const [searchQuery, setSearchQuery] = useState("");
+    // We use this invisible "ref" (reference) to automatically scroll the chat window to the very bottom
     const messagesEndRef = useRef(null);
 
+    // STEP 2: Load Contacts on Startup
+    // This effect runs EXACTLY ONCE when the page first loads
     useEffect(() => {
         fetchContacts();
     }, []);
 
+    // STEP 3: Load Chat History & Auto-Refresh
+    // This effect runs every time the user clicks on a DIFFERENT contact in the left sidebar
     useEffect(() => {
         if (selectedContact) {
+            // Immediately fetch the chat history for the person they just clicked
             fetchMessages(selectedContact.id);
+            
+            // Set up a background timer (interval) that checks for new messages every 5 seconds (5000ms)
+            // We pass `true` to `isPolling` so it doesn't interrupt the user while they are typing
             const interval = setInterval(() => fetchMessages(selectedContact.id, true), 5000);
+            
+            // Cleanup: If they click a different contact, stop checking for the old contact's messages
             return () => clearInterval(interval);
         }
     }, [selectedContact]);
 
+    // STEP 4: Auto-Scroll to Bottom
+    // Whenever the `messages` array changes (like when we receive or send a new one), scroll down!
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // --- HELPER FUNCTIONS ---
+
+    // Fetches the list of people (vendors) this supplier has talked to
     const fetchContacts = async () => {
-        const token = localStorage.getItem("supplierToken");
+        const token = localStorage.getItem("supplierToken"); // Get ID card
         try {
+            // Ask the database for our vendor contact list
             const res = await fetch("/api/chat/contacts-vendor", { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) setContacts(await res.json());
-        } catch (err) {} finally { setLoading(false); }
+            if (res.ok) setContacts(await res.json()); // Save it to the screen
+        } catch (err) {
+            // Silently ignore errors
+        } finally { 
+            setLoading(false); // Turn off the loading spinner
+        }
     };
 
+    // Fetches the actual conversation history for a specific person
     const fetchMessages = async (contactId, isPolling = false) => {
         const token = localStorage.getItem("supplierToken");
         try {
             const res = await fetch(`/api/chat/messages?contactId=${contactId}`, { headers: { Authorization: `Bearer ${token}` } });
             if (res.ok) {
                 const data = await res.json();
-                setMessages(data);
+                setMessages(data); // Put the messages on the screen
+                
+                // If this is the initial load (not the background check), and there are messages,
+                // we clear the little red "unread" notification badge next to their name.
                 if (!isPolling && data.length > 0) {
                     setContacts(prev => prev.map(c => c.id === contactId ? { ...c, unread_count: 0 } : c));
                 }
@@ -56,23 +85,36 @@ export default function SupplierMessagesPage() {
         } catch (err) {}
     };
 
+    // Called when the user clicks the "Send" arrow button
     const sendMessage = async (e) => {
-        e.preventDefault();
+        e.preventDefault(); // Stop the webpage from refreshing, which is the default form behavior
+        // If the text box is empty (or just spaces) or no one is selected, do nothing
         if (!newMessage.trim() || !selectedContact) return;
+        
         const token = localStorage.getItem("supplierToken");
-        setSending(true);
+        setSending(true); // Disable the send button so they don't click it twice by accident
+        
         try {
+            // Send the message to the database
             const res = await fetch("/api/chat/send", {
-                method: "POST",
+                method: "POST", // We are CREATING a new message
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                // Tell the server WHO we are sending it to, and WHAT we are saying
                 body: JSON.stringify({ receiver_id: selectedContact.id, content: newMessage })
             });
+            
             if (res.ok) {
                 const newMsg = await res.json();
+                // Manually add the new message to the bottom of the chat window instantly
+                // so we don't have to wait for the 5-second background check to see our own message
                 setMessages(prev => [...prev, { ...newMsg, receiver_id: selectedContact.id }]);
+                // Empty the typing text box so they can type another message
                 setNewMessage("");
             }
-        } catch (err) {} finally { setSending(false); }
+        } catch (err) {
+        } finally { 
+            setSending(false); // Re-enable the send button
+        }
     };
 
     const filteredContacts = contacts.filter(c => 

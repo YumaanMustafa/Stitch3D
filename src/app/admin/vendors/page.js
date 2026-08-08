@@ -40,10 +40,13 @@ export default function VendorManagement() {
     setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
   };
 
+  // PRIVILEGE 1: View All Vendors
+  // Only Admins can fetch the master list of all vendors and view their full company details.
   const fetchVendors = async () => {
     setLoading(true);
     setError("");
     try {
+      // The admin's JWT token is required to authorize this request
       const token = localStorage.getItem("adminToken");
       const res = await fetch("/api/admin/vendors", {
         headers: { Authorization: `Bearer ${token}` },
@@ -89,6 +92,9 @@ export default function VendorManagement() {
     setModalOpen(true);
   };
 
+  // PRIVILEGE 2: Gatekeeper Approval for Vendors
+  // Just like with suppliers, Admins are the only ones who can verify and activate a vendor account.
+  // Unapproved vendors cannot log in or use the platform.
   const confirmStatusUpdate = async () => {
     if (!selectedVendor || !pendingStatus) return;
 
@@ -119,6 +125,8 @@ export default function VendorManagement() {
     setModalOpen(true);
   };
 
+  // PRIVILEGE 3: Absolute Deletion for Vendors
+  // Admins can permanently delete a vendor's account, which will also delete their associated user account and products.
   const confirmDelete = async () => {
     if (!selectedVendor) return;
 

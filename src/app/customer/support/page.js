@@ -66,24 +66,34 @@ export default function SupportPage() {
     const [loadingComplaints, setLoadingComplaints] = useState(false);
     const [expandedComplaint, setExpandedComplaint] = useState(null);
 
+    // This function talks to our backend to get all the complaints this user has filed
     const fetchComplaints = async () => {
-        setLoadingComplaints(true);
+        setLoadingComplaints(true); // Show a loading spinner
         try {
+            // Get the user's security token so the backend knows who is asking
             const token = localStorage.getItem("token");
             const res = await fetch("/api/customer/complaints", {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            // If the backend replies successfully, save the list of complaints
             if (res.ok) setComplaints(await res.json());
         } catch (err) {
+            // If something goes wrong, log it so developers can fix it
             console.error("Failed to fetch complaints", err);
         } finally {
+            // Turn off the loading spinner when we are done
             setLoadingComplaints(false);
         }
     };
 
+    // This effect runs automatically. If the user has the "My Complaints" popup open,
+    // it will silently check the database every 10 seconds to see if support replied.
     useEffect(() => {
-        if (!isTrackingOpen) return;
-        const interval = setInterval(fetchComplaints, 10000);
+        if (!isTrackingOpen) return; // If popup is closed, do nothing
+        
+        const interval = setInterval(fetchComplaints, 10000); // Check every 10 seconds (10000 ms)
+        
+        // When the popup closes, clean up the timer so it doesn't run forever
         return () => clearInterval(interval);
     }, [isTrackingOpen]);
 

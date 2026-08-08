@@ -36,7 +36,9 @@ export default function DesignRequests() {
     }
   };
 
-  // Effect hook to fetch design requests on component mount
+  // PRIVILEGE 1: Direct Design Inbox
+  // Vendors only see design requests that customers specifically routed to their store.
+  // The system filters these requests securely on the backend using the vendor token.
   useEffect(() => {
     const fetchDesignRequests = async () => {
       try {
@@ -65,7 +67,9 @@ export default function DesignRequests() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Updates the design submission review status (e.g., Approved, Rejected, In Review)
+  // PRIVILEGE 2: Production Approval
+  // Vendors have the final say on whether they accept a custom design for production.
+  // They can mark it as "Approved", "Rejected", or "In Review".
   const updateStatus = async (id, newStatus) => {
     try {
       const res = await fetch(`/api/vendor/designs/${id}/status`, {

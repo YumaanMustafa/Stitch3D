@@ -13,58 +13,84 @@ import ConfirmationModal from "@/app/components/ConfirmationModal";
  */
 
 export default function SupplierVendorRequests() {
+    // STEP 1: Setting up State Variables
+    // `requests` holds the list of incoming requests from vendors
     const [requests, setRequests] = useState([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
+    // Modal state for viewing details or sending quotes
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [selectedRequest, setSelectedRequest] = useState(null); // The specific request they clicked on
     const [newStatus, setNewStatus] = useState("");
     
-    // Quote State
+    // STEP 2: Quote Calculation State
+    // Stores the financial breakdown for a custom quote before sending it to the vendor
     const [quoteData, setQuoteData] = useState({
         item_price: 0,
         tax: 0,
         shipping: 0
     });
+    // Disables buttons while talking to the database so they don't click twice
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Standard state for showing success/error popup messages
     const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => { }, hideCancel: false });
     const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
 
+    // STEP 3: Initial Data Load
+    // Runs once when the page opens to fetch the list of requests
     useEffect(() => {
         fetchRequests();
     }, []);
 
+    // Asks the database for all vendor requests sent to this specific supplier
     const fetchRequests = async () => {
         try {
-            const token = localStorage.getItem("supplierToken");
+            const token = localStorage.getItem("supplierToken"); // Get ID card
             const res = await fetch("/api/supplier/vendor-requests", { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) setRequests(await res.json());
-        } catch (err) {} finally { setLoading(false); }
+            
+            if (res.ok) {
+                // Save the data to React state to display on the screen
+                setRequests(await res.json());
+            }
+        } catch (err) {
+            // Silently ignore errors
+        } finally { 
+            setLoading(false); // Turn off the loading text
+        }
     };
 
+    // Filter the list of requests based on what the user typed in the search bar
     const filtered = requests.filter(req =>
         (req.material_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (req.vendor_name || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // STEP 4: Sending a Price Quote
+    // Triggered when the supplier fills in the prices and clicks "Send Quotation"
     const handleSendQuote = async () => {
         if (!selectedRequest) return;
-        setIsProcessing(true);
+        setIsProcessing(true); // Disable the send button
+        
         try {
+            // Calculate the final Grand Total by adding price, tax, and shipping together
             const total = Number(quoteData.item_price) + Number(quoteData.tax) + Number(quoteData.shipping);
             const token = localStorage.getItem("supplierToken");
+            
+            // Send a PUT request to update the status of this specific request from 'Pending' to 'Quoted'
             const res = await fetch(`/api/supplier/vendor-requests/${selectedRequest.id}/accept`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                // Send the broken-down prices AND the grand total to the database
                 body: JSON.stringify({ 
                     ...quoteData,
                     total
                 })
             });
+            
             if (res.ok) {
-                setIsModalOpen(false);
-                fetchRequests();
+                setIsModalOpen(false); // Close the popup window
+                fetchRequests(); // Refresh the list so the status changes to "Quoted"
                 showAlert("Quote Sent", "The quotation has been sent to the vendor successfully.");
             } else {
                 showAlert("Error", "Failed to send quotation.", "warning");
@@ -72,36 +98,49 @@ export default function SupplierVendorRequests() {
         } catch (err) {
             showAlert("Error", "Network error occurred.", "warning");
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(false); // Re-enable the button
         }
     };
 
+    // STEP 5: Declining a Request
+    // Triggered when the supplier clicks "Decline"
     const handleRejectRequest = async () => {
         if (!selectedRequest) return;
         setIsProcessing(true);
+        
         try {
             const token = localStorage.getItem("supplierToken");
+            // Send a PUT request to the backend to change the status to 'Rejected'
             const res = await fetch(`/api/supplier/vendor-requests/${selectedRequest.id}/reject`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (res.ok) {
                 setIsModalOpen(false);
                 fetchRequests();
                 showAlert("Request Rejected", "The material request has been declined.");
             }
-        } catch (err) {} finally { setIsProcessing(false); }
+        } catch (err) {
+            // Silently ignore
+        } finally { 
+            setIsProcessing(false); 
+        }
     };
 
+    // STEP 6: Handling Counter-Offers
+    // If the vendor didn't like our quote and sent a counter-offer, the supplier can accept it here
     const handleAcceptRenegotiation = async () => {
         if (!selectedRequest) return;
         setIsProcessing(true);
+        
         try {
             const token = localStorage.getItem("supplierToken");
             const res = await fetch(`/api/supplier/vendor-requests/${selectedRequest.id}/accept-renegotiation`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (res.ok) {
                 setIsModalOpen(false);
                 fetchRequests();

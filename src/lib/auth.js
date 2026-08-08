@@ -81,6 +81,7 @@ export async function getVendorIdFromUser(payload) {
 
 /**
  * Checks if the person making the request is an Admin.
+ * PRIVILEGE ENFORCEMENT: Ensures only users with the 'admin' role can access admin routes.
  * 
  * @param {Request} req - The incoming HTTP request
  * @returns {Object|null} The admin's user data, or null if they are not an admin
@@ -101,6 +102,7 @@ export function getAdminFromRequest(req) {
 
 /**
  * Checks if the person making the request is a Vendor.
+ * PRIVILEGE ENFORCEMENT: Ensures only users with the 'vendor' role can access vendor routes.
  * 
  * @param {Request} req - The incoming HTTP request
  * @returns {Object|null} The vendor's user data, or null if they are not a vendor
@@ -118,6 +120,7 @@ export function getVendorFromRequest(req) {
 
 /**
  * Checks if the person making the request is a Supplier.
+ * PRIVILEGE ENFORCEMENT: Ensures only users with the 'supplier' role can access supplier routes.
  * 
  * @param {Request} req - The incoming HTTP request
  * @returns {Object|null} The supplier's user data, or null if they are not a supplier
@@ -135,6 +138,7 @@ export function getSupplierFromRequest(req) {
 
 /**
  * Checks if the person making the request is a Customer.
+ * PRIVILEGE ENFORCEMENT: Ensures only users with the 'customer' role can access customer routes.
  * 
  * @param {Request} req - The incoming HTTP request
  * @returns {Object|null} The customer's user data, or null if they are not a customer

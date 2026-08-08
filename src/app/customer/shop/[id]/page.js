@@ -26,17 +26,22 @@ export default function ProductDetailPage() {
     const [reviewToDelete, setReviewToDelete] = useState(null);
     const [selectedSize, setSelectedSize] = useState(null);
 
+    // This effect runs automatically when the page loads, or if the product ID in the URL changes
     useEffect(() => {
+        // If there is no ID in the URL yet, do nothing and wait
         if (!id) return;
         
         const fetchData = async () => {
             try {
+                // 1. Fetch the main product details (name, price, image) from the database
                 const res = await fetch(`/api/public/products/${id}`);
                 if (!res.ok) throw new Error("Product not found");
                 const data = await res.json();
+                
+                // Save the product data to our state so we can display it on the screen
                 setProduct(data);
                 
-                // Fetch Reviews & Stats
+                // 2. Fetch all customer reviews and average star ratings for this specific product
                 const revRes = await fetch(`/api/public/reviews/${id}`);
                 if (revRes.ok) {
                     const revData = await revRes.json();
@@ -44,23 +49,31 @@ export default function ProductDetailPage() {
                     setReviewStats(revData.stats || { averageRating: 0, reviewCount: 0 });
                 }
 
-                // Check if Verified Buyer (only if logged in)
+                // 3. Check if the current user is a "Verified Buyer" (meaning they actually bought this jacket)
+                // First, check if they are even logged in by looking for a security token
                 const token = localStorage.getItem("token");
                 if (token) {
+                    // Ask the database for all the orders this user has ever placed
                     const orderRes = await fetch(`/api/customer/orders/my`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
+                    
                     if (orderRes.ok) {
                         const orders = await orderRes.json();
-                        // Find if any delivered order has this product
+                        // LOOP: Look through every order, and every item inside that order.
+                        // We are checking if they bought THIS specific product (design_id == id)
+                        // AND if the order was successfully delivered or completed.
                         const hasPurchased = orders.some(o => 
                             (o.status === 'delivered' || o.status === 'completed') && 
                             o.items.some(item => item.design_id == id)
                         );
+                        
+                        // Save true or false based on what we found
                         setIsVerifiedBuyer(hasPurchased);
                     }
 
-                    // Also fetch profile for customerId to handle "already reviewed" state
+                    // 4. Fetch the user's personal profile ID
+                    // We need this so we can check if they have ALREADY written a review for this jacket
                     const profileRes = await fetch("/api/customer/profile", {
                         headers: { Authorization: `Bearer ${token}` }
                     });
@@ -70,13 +83,15 @@ export default function ProductDetailPage() {
                     }
                 }
             } catch (err) {
+                // If anything fails, log the error so developers can fix it
                 console.error(err);
             } finally {
+                // Always turn off the loading spinner when we are done, even if it failed
                 setLoading(false);
             }
         };
 
-        fetchData();
+        fetchData(); // Execute the entire sequence
     }, [id]);
 
     // Populate existing review for editing

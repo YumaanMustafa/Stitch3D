@@ -6,7 +6,7 @@ import ConfirmationModal from "@/app/components/ConfirmationModal";
 /**
  * @file page.js
  * @description Admin User Management Page.
- * Lists all registered users (Customers, Vendors, Admins) with filtering options.
+ * Lists all registered users (Customers, Vendors, Suppliers) with filtering options.
  * Allows administrators to delete users via `/api/admin/users/[id]`.
  */
 
@@ -15,28 +15,33 @@ export default function UserManagement() {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Admin Privilege State: Controls the "Are you sure?" popup when deleting a user
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Custom Alert State
-  const [conf, setConf] = useState({ 
-    open: false, 
-    title: "", 
-    message: "", 
-    type: "warning", 
-    onConfirm: () => {}, 
-    hideCancel: false 
+  const [conf, setConf] = useState({
+    open: false,
+    title: "",
+    message: "",
+    type: "warning",
+    onConfirm: () => { },
+    hideCancel: false
   });
 
   const showAlert = (title, message, type = "success") => {
-    setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
+    setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
   };
 
+  // PRIVILEGE 1: Fetching All Users
+  // Only an Admin can call this endpoint and receive the master list of every user.
   const fetchUsers = async () => {
     setLoading(true);
     setError("");
     try {
+      // Grab the admin's master key (token) from local storage
       const token = localStorage.getItem("adminToken");
       const res = await fetch("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` },
@@ -55,6 +60,8 @@ export default function UserManagement() {
     fetchUsers();
   }, []);
 
+  // PRIVILEGE 2: Global Search
+  // Admins can search across the entire platform's user base instantly.
   useEffect(() => {
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
@@ -76,10 +83,13 @@ export default function UserManagement() {
     setDeleteModalOpen(true);
   };
 
+  // PRIVILEGE 3: Account Deletion
+  // Admins have the ultimate power to permanently delete any user account from the system.
   const confirmDelete = async () => {
     if (!userToDelete) return;
 
     try {
+      // The admin token is strictly required by the backend to process a deletion
       const token = localStorage.getItem("adminToken");
       const res = await fetch(`/api/admin/users/${userToDelete}`, {
         method: "DELETE",
@@ -89,6 +99,8 @@ export default function UserManagement() {
       if (!res.ok) throw new Error("Failed to delete user");
 
       showAlert("Deleted", "User has been permanently removed.");
+      // Refresh the list after deleting
+      fetchUsers();
     } catch (err) {
       showAlert("Error", err.message, "warning");
     }
@@ -141,11 +153,10 @@ export default function UserManagement() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                        user.role === 'vendor' ? 'bg-indigo-100 text-indigo-700' :
-                        'bg-amber-200 text-amber-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                          user.role === 'vendor' ? 'bg-indigo-100 text-indigo-700' :
+                            'bg-amber-200 text-amber-800'
+                        }`}>
                         {user.role}
                       </span>
                     </td>
@@ -158,7 +169,7 @@ export default function UserManagement() {
                       </div>
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <button 
+                      <button
                         onClick={() => handleDelete(user.user_id)}
                         className="bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-rose-700 transition shadow-lg shadow-rose-600/20 active:scale-95"
                       >
@@ -304,18 +315,18 @@ function MaskedField({ text, type }) {
   const maskText = (str) => {
     if (!str) return "N/A";
     if (isVisible) return str;
-    
+
     if (type === 'email') {
       const [user, domain] = str.split('@');
       return `${user.substring(0, 2)}***@${domain}`;
     }
-    
+
     // Phone masking
     return `${str.substring(0, 4)}*******`;
   };
 
   return (
-    <div 
+    <div
       className="flex items-center gap-2 text-[10px] font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer group/mask"
       onClick={() => setIsVisible(!isVisible)}
     >

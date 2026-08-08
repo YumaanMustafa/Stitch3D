@@ -7,11 +7,13 @@ import { motion } from "framer-motion";
 import { KeySquare } from "lucide-react";
 
 export default function SupplierForgotPassword() {
-  const [serverMessage, setServerMessage] = useState("");
-  const [isSuccess, setIsSuccess] = useState(false);
+  // STEP 1: State Variables
+  const [serverMessage, setServerMessage] = useState(""); // Holds the "Success" or "Error" text
+  const [isSuccess, setIsSuccess] = useState(false); // Controls if the message box is green (true) or red (false)
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-[#F97316] selection:text-white">
+      {/* Decorative Background Element */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-[30%] h-[30%] bg-[#F97316]/5 blur-[100px] rounded-full" />
       </div>
@@ -22,19 +24,25 @@ export default function SupplierForgotPassword() {
         className="w-full max-w-md relative z-10"
       >
         <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 md:p-14 shadow-2xl shadow-slate-200/50 text-center">
+          {/* Header */}
           <div className="w-16 h-16 bg-slate-100 rounded-2xl mx-auto flex items-center justify-center shadow-sm mb-8 border border-slate-200">
             <KeySquare className="text-[#F97316]" size={32} />
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic mb-2">Forgot Password</h1>
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-10">Reset your password</p>
 
+          {/* STEP 2: The Form */}
           <Formik
             initialValues={{ email: "" }}
+            // Ensure they actually type a valid email format before allowing submit
             validationSchema={Yup.object({ email: Yup.string().email("Invalid email").required("Required") })}
+            
+            // This runs when they click "Send Reset Link"
             onSubmit={async (v, { setSubmitting }) => {
-              setSubmitting(false);
+              // Normally we would send this to the backend here, but for this demo:
+              setSubmitting(false); // Stop loading animation
               setServerMessage("Reset link sent! Please check your email.");
-              setIsSuccess(true);
+              setIsSuccess(true); // Turn message box green
             }}
           >
             {({ isSubmitting }) => (

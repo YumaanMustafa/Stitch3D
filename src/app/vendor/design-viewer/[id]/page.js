@@ -193,9 +193,30 @@ export default function VendorFullscreenViewer({ params }) {
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Base Color</span><span className="text-xs font-black text-neutral-900">{colorObj.name}</span></div>
                                 <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Material</span><span className="text-xs font-black text-neutral-900">{designData.material}</span></div>
+                                <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Size</span><span className="text-xs font-black text-neutral-900">{designData.size && designData.size.toLowerCase().includes('custom') ? 'C (Custom)' : designData.size || 'N/A'}</span></div>
                                 <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Design ID</span><span className="text-xs font-black text-neutral-900">#{designData.id}</span></div>
                             </div>
                         </div>
+
+                        {/* Custom Measurements Breakdown */}
+                        {designData.size && designData.size.toLowerCase().includes('chest:') && (() => {
+                            const raw = designData.size.replace(/^Custom\s*\(/i, '').replace(/\)$/, '');
+                            const parts = raw.split(', ').map(p => p.split(': ')).filter(p => p.length === 2);
+                            if (parts.length === 0) return null;
+                            return (
+                                <div className="rounded-2xl p-6 border bg-neutral-50 border-neutral-100">
+                                    <div className="text-[10px] font-black uppercase tracking-widest mb-3 text-neutral-500">Custom Measurements</div>
+                                    <div className="space-y-2">
+                                        {parts.map(([label, value]) => (
+                                            <div key={label} className="flex justify-between items-center">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">{label}</span>
+                                                <span className="text-xs font-black text-neutral-900">{value ? value.replace(/"/g, '') : value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="space-y-3">
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Perspective</div>

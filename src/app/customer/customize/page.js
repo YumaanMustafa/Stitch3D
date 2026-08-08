@@ -9,10 +9,11 @@ import ConfirmationModal from '@/app/components/ConfirmationModal';
 
 /**
  * @file page.js
- * @description Product Customizer.
- * Core feature allowing users to customize jackets (Material, Color, Accessories).
- * Uses `fabric.js` for canvas manipulation and layering.
- * support saving designs to DB and adding to cart.
+ * @description Product Customizer (The Studio).
+ * This is the core engine of the website where customers design their jackets.
+ * It lets users pick colors, materials, and sizes, and adds patches/zippers to a 3D-like canvas.
+ * We use a library called `fabric.js` to handle all the image layering and dragging features.
+ * Finally, this page saves the user's masterpiece to the database and lets them add it to their cart.
  */
 
 const JACKET_COLORS = {
@@ -109,22 +110,33 @@ function CustomizerContent() {
         setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
     };
 
+    /**
+     * loadDesign
+     * This function takes a previously saved jacket design from the database
+     * and loads it back onto the screen so the user can continue editing it.
+     * 
+     * @param {Object} design - The saved design object containing colors, patches, etc.
+     */
     function loadDesign(design) {
+        // If the 3D canvas engine hasn't loaded yet, stop here.
         if (!fCanvas.current) return;
 
-        // Block side effects
+        // Block side effects: Tell the app we are currently loading something
+        // so it doesn't accidentally think the user is making new unsaved changes.
         isRestoring.current = true;
 
-        // 1. Restore Color
+        // 1. Restore Color: Set the jacket color (e.g., black, brown)
         setColor(design.color);
-        // Restore Material if exists
+        
+        // Restore Material: Find the matching leather material from our list
         const restoredMaterial = MATERIALS.find(m => m.id === design.material || m.name === design.material) || MATERIALS[0];
         setMaterial(restoredMaterial);
 
-        // Restore Size if exists
+        // Restore Size: Check if it's a standard size (S, M, L) or a custom tailored size
         if (design.size && design.size.startsWith('Custom')) {
             setSize('Custom');
             try {
+                // Use a pattern matcher (Regex) to extract the chest, waist, and sleeve numbers from the saved string
                 const match = design.size.match(/Chest:\s*([\d.]+)"?,\s*Waist:\s*([\d.]+)"?,\s*Sleeve:\s*([\d.]+)"?/);
                 if (match) {
                     setCustomMeasurements({
@@ -137,38 +149,45 @@ function CustomizerContent() {
                 console.error("Failed to parse size measurements", e);
             }
         } else {
+            // Standard size
             setSize(design.size || 'M');
         }
 
-        // Restore Vendor if exists
+        // Restore Vendor: Which seller is making this jacket?
         if (design.vendor_id) setVendorId(design.vendor_id);
 
-        // 2. Deep clone views
+        // 2. Clone views: Load the front, back, left, and right side patches/zippers
         try {
             console.log("Debug: Loading Design Views", design.views);
+            // Create a deep copy (clone) of the views so we don't accidentally modify the original database object
             viewState.current = JSON.parse(JSON.stringify(design.views));
         } catch (e) {
             console.error("Failed to clone views", e);
+            // If it fails, start with an empty jacket
             viewState.current = { front: null, back: null, left: null, right: null };
         }
 
-        // 3. Reset Interface to Front
-        // We manually handle the view switch to ensure clean state
+        // 3. Reset Interface: Always start by showing the 'front' of the jacket
         setView('front');
-        previousView.current = 'front'; // Sync tracker
+        previousView.current = 'front'; // Keep track that we are looking at the front
 
-        // 4. Force load 'front'
+        // 4. Force load 'front' canvas
+        // Clear anything currently drawn on the screen
         fCanvas.current.clear();
         fCanvas.current.backgroundColor = null;
 
+        // Find the saved patches/zippers for the front of the jacket
         const frontState = viewState.current['front'];
         if (frontState) {
             console.log("Debug: Restoring Front View State");
+            // Tell fabric.js to draw the saved items onto the screen
             fCanvas.current.loadFromJSON(frontState, () => {
+                // Re-render the screen to show the newly drawn items
                 fCanvas.current.renderAll();
                 console.log("Design loaded successfully - Objects count:", fCanvas.current.getObjects().length);
-                isRestoring.current = false; // Re-enable persistence
-                setHasUnsavedChanges(false); // Clean state
+                // We are done loading! Unblock side effects.
+                isRestoring.current = false; 
+                setHasUnsavedChanges(false); // The design is identical to what's in the DB, so no unsaved changes yet.
             });
         } else {
             console.warn("Debug: No Front View State found");
@@ -191,30 +210,37 @@ function CustomizerContent() {
         }
     };
 
-    // Load Saved Designs & Custom Uploads on Mount
+    // Load Saved Designs, Custom Uploads, and Vendors when the page first loads
     useEffect(() => {
-        // Fetch Designs
+        // 1. Get the user's security token from their browser to prove who they are
         const token = localStorage.getItem("token");
+        // If they have a token, attach it to our requests, otherwise send empty headers
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+        // 2. Fetch the user's previously saved designs from the database
         fetch('/api/customer/designs', { headers })
             .then(res => {
                 if (res.status === 401 || res.status === 403) {
-                    // If unauthorized, just return empty array and don't crash
+                    // If they are unauthorized (not logged in), just return an empty array without crashing
                     return [];
                 }
                 return res.json();
             })
             .then(data => {
+                // If the database successfully returned a list of designs
                 if (Array.isArray(data)) {
+                    // Save them to our React state so they show up in the "Saved Designs" menu
                     setSavedDesigns(data);
 
-                    // Auto-load if ID present
+                    // Check if the URL has an ID (e.g. /customize?id=123) meaning the user clicked a specific design to load
                     if (designId && !hasLoadedRef.current) {
+                        // Find the exact design in the list that matches the ID from the URL
                         const target = data.find(d => d.id === designId);
                         if (target) {
                             console.log("Auto-loading design:", target.name);
+                            // Wait half a second, then load the design onto the canvas
                             setTimeout(() => loadDesign(target), 500);
+                            // Mark that we have loaded it so we don't accidentally load it twice
                             hasLoadedRef.current = true;
                         }
                     }
@@ -222,29 +248,30 @@ function CustomizerContent() {
             })
             .catch(err => console.error("Failed to load designs", err));
 
-        // Fetch Custom Uploads
+        // 3. Fetch any custom images (like logos or patches) the user has uploaded before
         fetch('/api/common/uploads', { headers })
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
+                    // Save them to state so they show up in the "Custom Uploads" tab
                     setCustomUploads(data);
                 }
             })
             .catch(err => console.error("Failed to load uploads", err));
 
-        // Fetch Vendors
+        // 4. Fetch the list of Artisans (Vendors) available to build this jacket
         fetch('/api/general/vendors')
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
                     setAvailableVendors(data);
-                    // Default to first vendor if none selected
+                    // Default to the very first vendor in the list if the user hasn't selected one yet
                     if (!vendorId && data.length > 0) setVendorId(data[0].vendor_id);
                 }
             })
             .catch(err => console.error("Failed to load vendors", err));
 
-        // Always show Material Guide when entering Studio
+        // 5. Always show the "Material Guide" popup automatically 1.5 seconds after entering the Studio
         setTimeout(() => {
             setShowOnboardingGuide(true);
         }, 1500);
@@ -595,7 +622,7 @@ function CustomizerContent() {
 
         const cartItemId = generateCartItemId();
         const finalSize = size === 'Custom'
-            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+            ? `Custom (Chest: ${customMeasurements.chest}, Waist: ${customMeasurements.waist}, Sleeve: ${customMeasurements.sleeve})`
             : size;
         const design = {
             id: cartItemId, // Session-specific ID for Cart (Context handles Uniqueness fallback)
@@ -682,25 +709,34 @@ function CustomizerContent() {
         executeSave(overwriteId, saveName);
     };
 
+    // ==========================================
+    // HELPER: Generate Snapshots for all 4 angles
+    // This creates miniature preview images (snapshots) of the custom jacket 
+    // from every angle so they can be shown in the cart and order history.
+    // ==========================================
     const generateSnapshots = async (currentColor, viewStateObj) => {
         const snapshots = {};
         const viewsList = ['front', 'back', 'left', 'right'];
         
         if (!window.fabric) return {};
 
+        // Create a temporary hidden HTML canvas to draw the snapshots on
         const bgCanvas = document.createElement('canvas');
         bgCanvas.width = 400;
         bgCanvas.height = 450;
         const bgCtx = bgCanvas.getContext('2d');
 
+        // Create a temporary hidden Fabric.js canvas to render the patches/zippers
         const fCanvasTemp = document.createElement('canvas');
         fCanvasTemp.width = 800;
         fCanvasTemp.height = 900;
         const staticFabric = new window.fabric.StaticCanvas(fCanvasTemp);
 
+        // Loop through all 4 views (front, back, left, right)
         for (const viewId of viewsList) {
             const basePath = `/assets/leather/${currentColor}_${viewId}`;
             
+            // 1. First, draw the base jacket image for this angle
             await new Promise((resolve) => {
                 const img = new Image();
                 img.onload = () => {
@@ -712,20 +748,24 @@ function CustomizerContent() {
                 img.src = `${basePath}.png`;
             });
 
+            // 2. Next, load any patches/zippers the user added to this specific angle
             const viewJson = viewStateObj[viewId];
             if (viewJson) {
                 await new Promise((resolve) => {
                     staticFabric.clear();
                     staticFabric.loadFromJSON(viewJson, () => {
                         staticFabric.renderAll();
+                        // 3. Overlay the patches on top of the base jacket image
                         bgCtx.drawImage(fCanvasTemp, 0, 0, 400, 450);
                         resolve();
                     });
                 });
             }
+            // 4. Save the combined final image as a compressed JPEG
             snapshots[viewId] = bgCanvas.toDataURL('image/jpeg', 0.7);
         }
 
+        // Clean up the temporary canvas to free memory
         staticFabric.dispose();
         return snapshots;
     };
@@ -740,7 +780,7 @@ function CustomizerContent() {
         const snapshots = await generateSnapshots(color, viewState.current);
 
         const finalSize = size === 'Custom'
-            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+            ? `Custom (Chest: ${customMeasurements.chest}, Waist: ${customMeasurements.waist}, Sleeve: ${customMeasurements.sleeve})`
             : size;
         const savedDesign = {
             id: finalId,
@@ -781,7 +821,7 @@ function CustomizerContent() {
                     // NEW: SYNC WITH CART VIA CONTEXT (Real-time)
                     try {
                         const syncFinalSize = size === 'Custom'
-                            ? `Custom (Chest: ${customMeasurements.chest}", Waist: ${customMeasurements.waist}", Sleeve: ${customMeasurements.sleeve}")`
+                            ? `Custom (Chest: ${customMeasurements.chest}, Waist: ${customMeasurements.waist}, Sleeve: ${customMeasurements.sleeve})`
                             : size;
                         const productUpdate = {
                             designId: data.design.id,
@@ -1090,21 +1130,34 @@ function CustomizerContent() {
                                     </button>
                                 </div>
 
+                                {/* Size Option 1: Standard Predefined Sizes (S, M, L, XL) */}
                                 {!(size === 'Custom' || (size && size.startsWith('Custom'))) ? (
-                                    <div className={`grid grid-cols-4 gap-2 p-1.5 rounded-2xl transition-colors duration-700 mb-3 ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'}`}>
-                                        {['S', 'M', 'L', 'XL'].map(s => (
-                                            <button 
-                                                key={s} 
-                                                onClick={() => { setSize(s); setHasUnsavedChanges(true); }} 
-                                                className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${size === s ? 'bg-[#ff6b00] text-white shadow-[0_10px_20px_rgba(255,107,0,0.3)] scale-105' : (theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-500 hover:text-neutral-900')}`}
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <>
+                                        {/* Grid displaying the standard jacket sizes */}
+                                        <div className={`grid grid-cols-4 gap-2 p-1.5 rounded-2xl transition-colors duration-700 mb-3 ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'}`}>
+                                            {['S', 'M', 'L', 'XL'].map(s => (
+                                                <button 
+                                                    key={s} 
+                                                    onClick={() => { setSize(s); setHasUnsavedChanges(true); }} 
+                                                    className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${size === s ? 'bg-[#ff6b00] text-white shadow-[0_10px_20px_rgba(255,107,0,0.3)] scale-105' : (theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-500 hover:text-neutral-900')}`}
+                                                >
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {/* Modal Trigger to view standard jacket size chart guide */}
+                                        <button
+                                            onClick={() => setActiveModal('size')}
+                                            className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === 'dark' ? 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10' : 'border-black/5 bg-black/5 text-slate-500 hover:bg-black/10'}`}
+                                        >
+                                            <Ruler size={14} /> View Size Chart
+                                        </button>
+                                    </>
                                 ) : (
-                                    <div className={`rounded-2xl border p-4 transition-colors duration-700 mb-3 ${theme === 'dark' ? 'border-white/10 bg-white/5' : 'border-slate-100 bg-slate-50'}`}>
-                                        <div className="grid grid-cols-3 gap-2">
+                                    /* Size Option 2: Custom Tailored Measurements Inputs */
+                                    <div className={`rounded-2xl border p-4 transition-colors duration-700 ${theme === 'dark' ? 'border-white/10 bg-white/5' : 'border-slate-100 bg-slate-50'}`}>
+                                        {/* Input fields for entering exact Chest, Waist, and Sleeve dimensions */}
+                                        <div className="grid grid-cols-3 gap-2 mb-3">
                                             {[
                                                 ['chest', 'Chest'],
                                                 ['waist', 'Waist'],
@@ -1126,14 +1179,23 @@ function CustomizerContent() {
                                                 </div>
                                             ))}
                                         </div>
+                                        {/* Button to validate and apply the custom measurements */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!customMeasurements.chest || !customMeasurements.waist || !customMeasurements.sleeve) {
+                                                    showToast("Please fill in Chest, Waist, and Sleeve measurements.");
+                                                    return;
+                                                }
+                                                showToast("Custom measurements saved!");
+                                                setHasUnsavedChanges(true);
+                                            }}
+                                            className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[9px] font-black uppercase tracking-widest hover:bg-[#ff6b00] dark:hover:bg-[#ff6b00] dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                        >
+                                            <Check size={13} /> Save Custom Size
+                                        </button>
                                     </div>
                                 )}
-                                <button
-                                    onClick={() => setActiveModal('size')}
-                                    className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === 'dark' ? 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10' : 'border-black/5 bg-black/5 text-slate-500 hover:bg-black/10'}`}
-                                >
-                                    <Ruler size={14} /> View Size Chart
-                                </button>
                             </section>
 
                             {/* Step 4: Perspective */}

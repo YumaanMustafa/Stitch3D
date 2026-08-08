@@ -25,6 +25,9 @@ export default function VendorOrders() {
     const [selectedStandardOrder, setSelectedStandardOrder] = useState(null);
     const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => { }, hideCancel: false });
 
+    // PRIVILEGE 1: Secure Order Access
+    // Vendors can only view orders that customers placed specifically with their store.
+    // The backend uses the vendorToken to filter the database, ensuring privacy between vendors.
     useEffect(() => {
         const fetchOrders = async () => {
             try {
@@ -44,6 +47,9 @@ export default function VendorOrders() {
     const standardOrders = filteredOrders.filter(o => !o.is_custom);
     const customOrders = filteredOrders.filter(o => o.is_custom);
 
+    // PRIVILEGE 2: Order Fulfillment Control
+    // Vendors have the authority to update the fulfillment status (e.g., Shipped, Delivered) 
+    // for their own orders, which directly updates the customer's tracking view.
     const handleStatusUpdate = async () => {
         if (!selectedOrder) return;
         try {
@@ -126,7 +132,7 @@ export default function VendorOrders() {
                                             </td>
                                             <td className="px-8 py-6">
                                                 <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border text-indigo-600 bg-indigo-50 border-indigo-100">
-                                                    {!order.size || order.size.startsWith('Custom') ? 'C' : ({ 'Small': 'S', 'Medium': 'M', 'Large': 'L', 'X-Large': 'XL', 'S': 'S', 'M': 'M', 'L': 'L', 'XL': 'XL' })[order.size] || 'C'}
+                                                    {!order.size || order.size.toLowerCase().includes('custom') ? 'C' : ({ 'Small': 'S', 'Medium': 'M', 'Large': 'L', 'X-Large': 'XL', 'S': 'S', 'M': 'M', 'L': 'L', 'XL': 'XL' })[order.size] || 'C'}
                                                 </span>
                                             </td>
                                             <td className="px-8 py-6 text-right">
@@ -240,24 +246,7 @@ export default function VendorOrders() {
             <Modal isOpen={isDesignViewerOpen} onClose={() => setIsDesignViewerOpen(false)} title="Vendor Design Viewer" maxWidth="max-w-2xl">
                 {selectedDesignOrder && (
                     <div className="space-y-6 p-4">
-                        <DesignViewer designId={selectedDesignOrder.design_id || selectedDesignOrder.id} />
-                        {selectedDesignOrder.size && selectedDesignOrder.size.startsWith('Custom') && (() => {
-                            const raw = selectedDesignOrder.size.replace(/^Custom\s*\(/, '').replace(/\)$/, '');
-                            const parts = raw.split(', ').map(p => p.split(': '));
-                            return (
-                                <div className="bg-orange-50/40 border border-orange-100 rounded-[1.5rem] px-6 py-4">
-                                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#F97316] mb-3">Custom Measurements</p>
-                                    <div className="flex flex-wrap gap-6">
-                                        {parts.map(([label, value]) => (
-                                            <div key={label} className="flex flex-col">
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-                                                <span className="text-sm font-black text-slate-900 tracking-tighter">{value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                        <DesignViewer designId={selectedDesignOrder.design_id || selectedDesignOrder.id} size={selectedDesignOrder.size} />
                         <div className="flex justify-end pt-4">
                             <button onClick={() => setIsDesignViewerOpen(false)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F97316] transition-all">Close Viewer</button>
                         </div>

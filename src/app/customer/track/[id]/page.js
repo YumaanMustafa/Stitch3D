@@ -18,23 +18,32 @@ export default function OrderTrackingPage() {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // This effect runs automatically when the page loads to fetch the specific order we are tracking
     useEffect(() => {
+        // 1. Get the user's security token to prove they are logged in
         const token = localStorage.getItem("token");
         if (!token) {
+            // If they aren't logged in, redirect them to the login page
             router.replace("/login");
             return;
         }
 
         const fetchOrder = async () => {
             try {
-                // Since there isn't a direct /customer/orders/[id] API in context, fetch all and find
+                // 2. Fetch all of this customer's orders from the database
+                // Since there isn't a direct /customer/orders/[id] API in context, we fetch all and find the one we need
                 const res = await fetch('/api/customer/orders/my', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 
                 if (res.ok) {
                     const orders = await res.json();
+                    
+                    // 3. Look through all their orders to find the one that matches the ID in the URL
+                    // We use String() to make sure we are comparing text to text (e.g., "12" === "12")
                     const target = orders.find(o => String(o.id) === String(params.id));
+                    
+                    // If we found the order, save it so we can display the tracking progress
                     if (target) {
                         setOrder(target);
                     }
@@ -42,6 +51,7 @@ export default function OrderTrackingPage() {
             } catch (err) {
                 console.error("Order track fetch err", err);
             } finally {
+                // 4. Turn off the loading spinner when we are finished
                 setLoading(false);
             }
         };

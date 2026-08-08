@@ -10,6 +10,9 @@ import ConfirmationModal from "@/app/components/ConfirmationModal";
  * @description Supplier Profile - Simplified Text & Modern Light Theme.
  */
 
+// STEP 1: Define Form Rules (Validation)
+// We use 'Yup' to make sure the supplier doesn't leave required boxes empty.
+// If they try to save without a name, it will block them and show "Required".
 const SupplierProfileSchema = Yup.object().shape({
   name: Yup.string().required("Required"),
   email: Yup.string().email("Invalid email").required("Required"),
@@ -17,17 +20,25 @@ const SupplierProfileSchema = Yup.object().shape({
 });
 
 export default function SupplierProfile() {
+  // STEP 2: Setup Page State
+  // `initialValues` holds the default placeholder data when the page first loads
   const [initialValues, setInitialValues] = useState({
     name: "Material Pro",
     email: "supplier@stitch.com",
     company: "Pro Materials Ltd.",
   });
 
+  // State for controlling the popup success/error alerts
   const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => { }, hideCancel: false });
   const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
 
+  // STEP 3: Handle Form Submission
+  // Triggered when they click "Save Changes"
   const handleSubmit = (values, { setSubmitting }) => {
+    // In a real app, we would send 'values' to the database here.
+    // For now, we just show a success popup.
     showAlert("Success", "Profile updated successfully.");
+    // Turn off the "Saving..." text on the button so they can click it again
     setSubmitting(false);
   };
 

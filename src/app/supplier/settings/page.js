@@ -23,58 +23,97 @@ const PasswordSchema = Yup.object().shape({
 });
 
 export default function SupplierSettings() {
+  // STEP 1: Setting up State Variables
+  // `initialSettings` stores the supplier's current name and email fetched from the database
   const [initialSettings, setInitialSettings] = useState({ name: "", email: "" });
-  const [loading, setLoading] = useState(true);
-  const [isNameEditing, setIsNameEditing] = useState(false);
-  const [isPasswordEditing, setIsPasswordEditing] = useState(false);
-  const [message, setMessage] = useState("");
-  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true); // Shows a loading message until data is ready
+  const [isNameEditing, setIsNameEditing] = useState(false); // Tracks if the user clicked the Pencil icon for their Name
+  const [isPasswordEditing, setIsPasswordEditing] = useState(false); // Tracks if they clicked the Pencil for their Password
+  const [message, setMessage] = useState(""); // Used to show a temporary success/error popup at the bottom of the screen
+  const [mounted, setMounted] = useState(false); // Helps prevent React rendering bugs with popups (Portals)
 
+  // STEP 2: Load Settings on Startup
+  // This runs once when the Settings page opens
   useEffect(() => {
-    setMounted(true);
-    fetchSettings();
+    setMounted(true); // Tell React the page has successfully loaded into the browser
+    fetchSettings(); // Go get the data!
   }, []);
 
+  // STEP 3: Fetch Supplier Details
+  // Asks the database for the supplier's saved profile information
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem("supplierToken");
+      const token = localStorage.getItem("supplierToken"); // Get their digital ID card
+      
+      // Make a network request to our settings API
       const res = await fetch("/api/supplier/settings", { headers: { "Authorization": `Bearer ${token}` } });
-      if (res.ok) setInitialSettings(await res.json());
-    } catch (err) {} finally { setLoading(false); }
+      
+      if (res.ok) {
+          // If successful, save the data to our React state
+          setInitialSettings(await res.json());
+      }
+    } catch (err) {
+        // Silently ignore network errors
+    } finally { 
+        setLoading(false); // Turn off the loading text
+    }
   };
 
+  // STEP 4: Update Profile (Name)
+  // This function is triggered when they type a new name and click "Save Changes"
   const handleUpdateProfile = async (values, { setSubmitting }) => {
     try {
       const token = localStorage.getItem("supplierToken");
+      
+      // Send a PUT request (used for updating existing records) to the backend
       const res = await fetch("/api/supplier/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(values)
+        body: JSON.stringify(values) // Send the new name in JSON format
       });
+      
       if (res.ok) {
+        // 1. Show a success message
         setMessage("Profile Updated");
+        // 2. Hide the edit form, changing it back to a display view
         setIsNameEditing(false);
+        // 3. Update the local state so the new name instantly shows on screen without refreshing
         setInitialSettings(prev => ({ ...prev, name: values.name }));
+        // 4. Make the success popup disappear after 3 seconds (3000ms)
         setTimeout(() => setMessage(""), 3000);
       }
-    } catch (err) {} finally { setSubmitting(false); }
+    } catch (err) {
+        // Handle errors silently
+    } finally { 
+        // Re-enable the submit button
+        setSubmitting(false); 
+    }
   };
 
+  // STEP 5: Update Password
+  // This function is triggered when they fill out the password form and click "Update Password"
   const handleUpdatePassword = async (values, { setSubmitting, resetForm }) => {
     try {
       const token = localStorage.getItem("supplierToken");
+      
+      // Send the current and new passwords to the server for verification and saving
       const res = await fetch("/api/supplier/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        // We only send the necessary fields to the backend
         body: JSON.stringify({ password: values.currentPassword, newPassword: values.newPassword })
       });
+      
       const data = await res.json();
+      
       if (res.ok) {
+        // Password changed successfully!
         setMessage("Password Updated Successfully");
-        setIsPasswordEditing(false);
-        resetForm();
+        setIsPasswordEditing(false); // Hide the password edit form
+        resetForm(); // Empty the text boxes for security
         setTimeout(() => setMessage(""), 3000);
       } else {
+        // The server rejected the change (e.g., they typed their current password wrong)
         setMessage(data.error || "Failed to update password");
         setTimeout(() => setMessage(""), 3000);
       }

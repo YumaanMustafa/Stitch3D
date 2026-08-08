@@ -32,6 +32,9 @@ async function getVendorId(request) {
 export async function GET(request) {
     try {
         // Step 1: Security Check
+        // PRIVILEGE 1: Inventory Isolation
+        // Vendors can only fetch their own products.
+        // We strictly check the token and extract their specific vendorId.
         const vendorId = await getVendorId(request);
         if (!vendorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

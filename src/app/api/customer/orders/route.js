@@ -22,7 +22,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 export async function POST(request) {
     try {
         // Step 1: Authentication Check
-        // Make sure they are logged in before we let them buy anything
+        // PRIVILEGE: Customer Ordering
+        // Only authenticated users can place orders. 
+        // We strictly verify their token to securely attach the order to their identity.
         const authHeader = request.headers.get('authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

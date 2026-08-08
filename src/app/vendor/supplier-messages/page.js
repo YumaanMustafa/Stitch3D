@@ -34,6 +34,9 @@ export default function VendorSupplierMessagesPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // PRIVILEGE 1: Secure B2B Communications
+    // Vendors can only fetch their own private conversations with their suppliers.
+    // The backend uses their vendorToken to prevent them from reading other vendors' chats.
     const fetchContacts = async () => {
         const token = localStorage.getItem("vendorToken");
         try {

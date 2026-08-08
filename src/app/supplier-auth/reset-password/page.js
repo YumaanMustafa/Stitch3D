@@ -20,34 +20,48 @@ const ResetSchema = Yup.object().shape({
 });
 
 function SupplierResetPasswordContent() {
+    // STEP 1: Setting up State Variables
     const router = useRouter();
-    const params = useSearchParams();
-    const emailFromQuery = params?.get("email") ?? "";
+    const params = useSearchParams(); // Reads the URL parameters
+    // Grabs their email from the URL (e.g. ?email=test@test.com) so they don't have to type it again
+    const emailFromQuery = params?.get("email") ?? ""; 
 
-    const [serverMessage, setServerMessage] = useState("");
-    const [isSuccess, setIsSuccess] = useState(false);
+    const [serverMessage, setServerMessage] = useState(""); // Holds success/error text
+    const [isSuccess, setIsSuccess] = useState(false); // Colors the message box green or red
 
+    // STEP 2: Reset Password Function
+    // Runs when they click "Save Password"
     const handleReset = async (values, { setSubmitting }) => {
+        // Clear previous messages
         setServerMessage("");
         setIsSuccess(false);
 
         try {
+            // 2A: Send their email, the 6-digit code, and their new password to the server
             const res = await fetch("/api/auth/reset-password", {
-                method: "POST",
+                method: "POST", // POST because passwords must be sent securely
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: values.email, code: values.code, newPassword: values.newPassword }),
             });
+            
             const data = await res.json();
+            
+            // 2B: Handle the Result
             if (res.ok) {
+                // Success! The code matched and the password was updated.
                 setIsSuccess(true);
                 setServerMessage("Updated! Redirecting to login...");
+                // Wait 2 seconds, then send them back to the login page so they can sign in with their new password
                 setTimeout(() => router.push("/supplier-auth/login"), 2000);
             } else {
+                // Failure! The code might have been wrong or expired
                 setServerMessage(data.message || "Failed.");
             }
         } catch (err) {
+            // Handle network issues
             setServerMessage("Error. Try again.");
         } finally {
+            // Stop the loading spinner
             setSubmitting(false);
         }
     };

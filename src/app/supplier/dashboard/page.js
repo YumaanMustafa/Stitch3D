@@ -17,6 +17,9 @@ import {
  */
 
 export default function SupplierDashboard() {
+  // STEP 1: Setting up State Variables
+  // `data` holds all the information we want to show on the screen (stats, charts, alerts)
+  // `loading` tells us if we are still waiting for the backend to reply so we can show a spinner
   const [data, setData] = useState({
     stats: { revenue: 0, orders: 0, pending: 0, growth: 0, inventoryAlerts: [], activityFeed: [] },
     chart: [],
@@ -24,15 +27,32 @@ export default function SupplierDashboard() {
   });
   const [loading, setLoading] = useState(true);
 
+  // STEP 2: Fetch Data on Load
+  // This `useEffect` runs exactly once when the Supplier Dashboard is opened
   useEffect(() => {
+    // We create an asynchronous function because talking to the database takes time
     const fetchData = async () => {
       try {
+        // STEP 2A: Verify Identity
+        // Get the supplier's digital ID card (token) from local storage
         const token = localStorage.getItem("supplierToken");
+        
+        // STEP 2B: Ask Backend for Data
+        // Send a request to our specific API endpoint that calculates supplier statistics
         const res = await fetch("/api/supplier/dashboard/stats", {
+          // Show our ID card so the server knows which supplier's stats to calculate
           headers: { Authorization: `Bearer ${token}` },
         });
+        
+        // STEP 2C: Process the Response
+        // If the server replies successfully (e.g., status 200)
         if (res.ok) {
+          // Convert the raw data into a Javascript object
           const result = await res.json();
+          
+          // STEP 3: Update the Screen
+          // We use `setData` to pass this new data into our React state, which triggers a screen redraw
+          // We use `|| []` (OR empty array) as a fallback just in case the server forgets to send that specific piece of data
           setData({
             stats: { ...result, inventoryAlerts: result.inventoryAlerts || [], activityFeed: result.activityFeed || [] },
             chart: result.chart || [],
@@ -40,13 +60,18 @@ export default function SupplierDashboard() {
           });
         }
       } catch (err) {
-        console.error(err);
+        // If the internet disconnects or the server crashes, log it for developers
+        console.error("Dashboard fetch error:", err);
       } finally {
+        // STEP 4: Clean Up
+        // Whether it succeeded or failed, turn off the loading spinner so the user can see the dashboard
         setLoading(false);
       }
     };
+    
+    // Actually run the async function we just defined above
     fetchData();
-  }, []);
+  }, []); // The empty array means "only run this when the page first loads"
 
   const chartData = data.chart.length > 0 ? data.chart : [
     { name: "MON", revenue: 0 },

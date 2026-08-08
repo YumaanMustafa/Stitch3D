@@ -12,33 +12,49 @@ import { motion, AnimatePresence } from "framer-motion";
 
 /**
  * @file page.js
- * @description Stitch Definitive Landing Page.
- * Purely aligned with Midnight Navy (#1E293B) and Vibrant Orange (#F97316).
- * Focuses on the core Bespoke Leather Studio value proposition.
+ * @description Stitch Definitive Landing Page (Home Page).
+ * This is the very first page a user sees when they visit the website. 
+ * It showcases the brand, the customizer studio, and trending products.
  */
 
 export default function HomePage() {
+  // Tool to navigate between pages
   const router = useRouter();
+  
+  // State to track if the user has scrolled down the page (used to change header color)
   const [activeScrolled, setActiveScrolled] = useState(false);
+  // State to track if the mobile navigation menu is open
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // State to store the trending products fetched from the database
   const [trendingProducts, setTrendingProducts] = useState([]);
+  // State to track if the person viewing the page is logged in
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // useEffect runs once when the page first loads
   useEffect(() => {
+    // 1. Check if the user is logged in by looking for a saved token
     setIsLoggedIn(!!localStorage.getItem("token"));
     
+    // 2. Fetch the trending products from our backend API
     fetch('/api/public/products/trending')
-      .then(res => res.json())
+      .then(res => res.json()) // Convert the response to JSON
       .then(data => {
+        // If we got an array of products back, save them to state
         if (Array.isArray(data)) setTrendingProducts(data);
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error("Error fetching trending products:", err));
 
+    // 3. Setup a scroll listener to detect when the user scrolls down
+    // This helps us change the top navigation bar's background color
     const handleScroll = () => setActiveScrolled(window.scrollY > 20);
+    // Attach the listener to the browser window
     window.addEventListener("scroll", handleScroll);
+    
+    // Cleanup function: remove the listener if the user leaves the page
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // List of links for the top navigation bar
   const navLinks = [
     { name: "The Studio", href: "#studio" },
     { name: "Craftsmanship", href: "#craft" },

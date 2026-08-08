@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
  */
 
 // DesignViewer takes the unique designId as a prop
-export default function DesignViewer({ designId }) {
+export default function DesignViewer({ designId, size: propSize }) {
     // Refs to interact directly with the DOM canvas elements
     const canvasRef = useRef(null);
     const fCanvas = useRef(null); // Holds the actual Fabric.js canvas instance
@@ -223,6 +223,8 @@ export default function DesignViewer({ designId }) {
         return <div className="h-96 flex items-center justify-center text-red-400 font-bold uppercase tracking-widest text-xs">Design Not Found</div>;
     }
 
+    const effectiveSize = propSize || designData.size || null;
+
     return (
         // Main container
         <div className="flex flex-col items-center bg-slate-50 p-4 rounded-3xl border border-slate-100 shadow-inner">
@@ -254,18 +256,45 @@ export default function DesignViewer({ designId }) {
                 </div>
             </div>
 
-            {/* Bottom section showing text details about the jacket materials */}
-            <div className="w-full mt-6 grid grid-cols-2 gap-4 relative z-50">
-                {/* Color Box */}
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Color</p>
-                    <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{JACKET_COLORS[designData.color]?.name || designData.color}</p>
+            {/* Bottom section showing text details about the jacket materials and custom size measurements */}
+            <div className="w-full mt-6 space-y-4 relative z-50">
+                <div className="grid grid-cols-3 gap-4">
+                    {/* Color Box */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Color</p>
+                        <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{JACKET_COLORS[designData.color]?.name || designData.color}</p>
+                    </div>
+                    {/* Material Box */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Material</p>
+                        <p className="text-sm font-bold text-slate-900">{designData.material}</p>
+                    </div>
+                    {/* Size Box */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Size</p>
+                        <p className="text-sm font-bold text-slate-900">{effectiveSize && effectiveSize.toLowerCase().includes('custom') ? 'C (Custom)' : effectiveSize || 'N/A'}</p>
+                    </div>
                 </div>
-                {/* Material Box */}
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Material</p>
-                    <p className="text-sm font-bold text-slate-900">{designData.material}</p>
-                </div>
+
+                {/* Custom Measurements Breakdown if customer entered custom values */}
+                {effectiveSize && effectiveSize.toLowerCase().includes('chest:') && (() => {
+                    const raw = effectiveSize.replace(/^Custom\s*\(/i, '').replace(/\)$/, '');
+                    const parts = raw.split(', ').map(p => p.split(': ')).filter(p => p.length === 2);
+                    if (parts.length === 0) return null;
+                    return (
+                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Custom Measurements</p>
+                            <div className="grid grid-cols-3 gap-4">
+                                {parts.map(([label, value]) => (
+                                    <div key={label} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+                                        <span className="text-xs font-black text-slate-900 tracking-tight">{value ? value.replace(/"/g, '') : value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
             
         </div>

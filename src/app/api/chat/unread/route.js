@@ -19,6 +19,9 @@ import { getChatUserId } from '../auth.js';
 export async function GET(request) {
     try {
         // Step 1: Security Check. Verify who is asking for their unread count.
+        // PRIVILEGE: Cross-Role Messaging Privacy
+        // A user (Customer, Vendor, or Supplier) can only count messages explicitly sent to their own ID.
+        // We use their decrypted token payload to securely ensure they can't spy on other users' notification badges.
         const auth = await getChatUserId(request);
         if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

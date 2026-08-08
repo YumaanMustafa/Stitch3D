@@ -17,6 +17,9 @@ export default function VendorReviewsPage() {
     const [filter, setFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
 
+    // PRIVILEGE 1: Secure Feedback Access
+    // Vendors can only fetch reviews left on their own products.
+    // The backend uses their vendorToken to ensure they cannot read reviews for competitors' products.
     const fetchReviews = async () => {
         try {
             const token = localStorage.getItem("vendorToken");

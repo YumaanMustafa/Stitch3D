@@ -80,59 +80,86 @@ export default function CheckoutPage() {
 
   /* =========================================================================
      1. LOAD CART & AUTHENTICATION
-     Reads user session, retrieves their specific cart key, and populates
-     pre-filled shipping details from their saved Customer Profile.
+     This effect runs as soon as the checkout page opens. It checks if the user
+     is logged in, loads their shopping cart, and pre-fills their address.
      ========================================================================= */
   useEffect(() => {
+    // STEP 1A: Security Check
+    // We look in local storage for a "token". This is the user's digital ID card.
     const token = localStorage.getItem("token");
     if (!token) {
+      // If they don't have a token, they aren't logged in. 
+      // We send them to the login page and tell the login page to send them back here afterwards.
       router.push("/login?redirect=/customer/checkout");
       return;
     }
 
+    // STEP 1B: Load the User's Specific Shopping Cart
     try {
-      // Decode JWT to extract unique userId to fetch the user-specific cart from localStorage
+      // The token is actually a secure string with 3 parts separated by dots.
+      // We split it, take the middle part (the payload), and decode it using `atob`
       const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      // We extract their unique User ID from the decoded payload
       const userId = payload.id || payload.userId;
+      
+      // We use their User ID to find THEIR specific cart in local storage (e.g., "cart_123")
+      // If we can't find their ID for some reason, we fall back to the default "cart"
       const cartKey = userId ? `cart_${userId}` : 'cart';
+      
+      // We read the cart data. If there is no data, we use an empty array "[]"
       const cart = JSON.parse(localStorage.getItem(cartKey) || "[]");
+      
+      // We use a tiny timeout to safely update the screen state without crashing React
       setTimeout(() => {
         setCartItems(cart);
       }, 0);
     } catch (e) {
+      // If decoding the token fails, we just empty the cart to be safe
       setTimeout(() => {
         setCartItems([]);
       }, 0);
     }
 
-    // Retrieve saved user profile details to auto-fill the shipping form
+    // STEP 1C: Auto-fill the Shipping Address
+    // We ask the backend database for the user's saved profile details
     fetch("/api/customer/profile", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` }, // We show our ID card
     })
       .then((res) => res.json())
       .then((data) => {
+        // We take the data from the database and plug it directly into our form's starting values!
         setInitialFormValues({
           phone_number: data.phone_number || "",
           address: data.address || "",
           city: data.city || "",
           country: data.country || "Pakistan",
           postal_code: data.postal_code || "",
+          // If they have a saved card ending in 4 digits, default to "Card", otherwise "COD" (Cash on Delivery)
           payment_method: data.payment_card_last4 ? "Card" : "COD",
           card_number: data.payment_card_last4 ? `•••• •••• •••• ${data.payment_card_last4}` : "",
           card_expiry: data.payment_card_expiry || "",
           card_cvv: data.payment_card_last4 ? "•••" : "",
         });
       })
-      .finally(() => setLoading(false));
-  }, [router]);
+      .finally(() => {
+        // Once we are completely done loading data, we turn off the loading spinner
+        setLoading(false);
+      });
+  }, [router]); // This empty-ish array means it only runs when the page first loads
 
   /* =========================================================================
      2. PRICE CALCULATIONS
-     Computes order financials including subtotal, progressive shipping costs, 
-     taxes, and final order total.
+     We calculate the total cost of the order dynamically based on the cart.
      ========================================================================= */
+     
+  // STEP 2A: Calculate the Subtotal (the price of the items themselves)
+  // useMemo remembers the result so it doesn't recalculate unless the cart changes.
   const subtotal = useMemo(
     () =>
+      // `.reduce` loops through every item in the cart.
+      // For each item, it takes the price, multiplies it by how many they bought (quantity),
+      // and adds it to a running `sum` that starts at 0.
       cartItems.reduce(
         (sum, item) => sum + Number(item.price) * item.quantity,
         0
@@ -140,35 +167,46 @@ export default function CheckoutPage() {
     [cartItems]
   );
 
-  // Apply free shipping if order exceeds the threshold limits
+  // STEP 2B: Calculate Shipping Fee
+  // If their subtotal is greater than or equal to the FREE_SHIPPING_THRESHOLD (e.g., 5000), 
+  // shipping is 0 (Free!). Otherwise, they pay the standard SHIPPING_FEE.
   const shippingFee =
     subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
 
+  // STEP 2C: Calculate Taxes
+  // We multiply the subtotal by the TAX_RATE (e.g., 0.17 for 17%) and round it to a whole number.
   const taxAmount = Math.round(subtotal * TAX_RATE);
+  
+  // STEP 2D: Final Grand Total
+  // We add the items, the shipping, and the taxes together.
   const total = subtotal + shippingFee + taxAmount;
 
   /* =========================================================================
      3. HANDLERS AND SUBMISSIONS
+     What happens when they actually click the "Place Order" button.
      ========================================================================= */
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // Submits checkout data: updates customer profile first, then posts order to API
+  // This function is triggered by the Formik form when it is successfully submitted and validated
   const handlePlaceOrder = async (values, { setSubmitting }) => {
+    // Grab the ID card again
     const token = localStorage.getItem("token");
 
     try {
-      /* Step A: Save or update the customer profile with the latest shipping address */
+      /* STEP 3A: Update their Profile Settings */
+      // We send their typed-in address back to the database to save it for next time!
       await fetch("/api/customer/profile", {
-        method: "POST",
+        method: "POST", // POST means we are sending data TO the server
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json", // We tell the server we are sending JSON data
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(values), // We convert the form data into a text string
       });
 
-      /* Step B: Place the official order in the DB */
+      /* STEP 3B: Create the Official Order */
+      // We send the cart items and the final calculated prices to the Orders database
       const res = await fetch("/api/customer/orders", {
         method: "POST",
         headers: {
@@ -176,33 +214,46 @@ export default function CheckoutPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          items: cartItems,
-          shipping_address: values,
-          payment_method: values.payment_method,
+          items: cartItems, // Everything they are buying
+          shipping_address: values, // Where to send it
+          payment_method: values.payment_method, // How they are paying
           subtotal,
           shipping_fee: shippingFee,
           tax: taxAmount,
-          total,
+          total, // The grand total calculated earlier
         }),
       });
 
+      // If the server rejects the order for some reason, throw an error to trigger the catch block below
       if (!res.ok) throw new Error("Order failed");
 
-      // Clean up the user-specific cart from localStorage on order success
+      /* STEP 3C: Clean up the Cart */
+      // Because the order was successful, they don't need these items in their cart anymore!
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userId = payload.id || payload.userId;
         const cartKey = userId ? `cart_${userId}` : 'cart';
-        localStorage.removeItem(cartKey);
+        localStorage.removeItem(cartKey); // Delete the cart from local storage
       } catch (e) {
-        localStorage.removeItem("cart"); // Fallback
+        localStorage.removeItem("cart"); // Fallback just in case
       }
-      clearCart(); // Sync Context Cart
+      
+      // We also tell the global website system that the cart is now empty
+      clearCart(); 
+      
+      /* STEP 3D: Success Redirect */
+      // We send them to their order history page, and pass a secret message in the URL (?success=true) 
+      // so that page knows to show a confetti celebration!
       router.push("/customer/orders?success=true");
+      
     } catch (err) {
+      // If ANY step above fails, the code jumps straight down here.
       console.error(err);
+      // Show an error popup to the user
       showAlert("Order Error", "Something went wrong while placing your order. Please try again later.", "warning");
     } finally {
+      // Whether it succeeded or failed, we tell the form it is no longer "submitting" 
+      // so the button becomes clickable again.
       setSubmitting(false);
     }
   };

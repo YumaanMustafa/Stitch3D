@@ -14,7 +14,10 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // PRIVILEGE 1: Secure Admin Profile Access
+    // Fetches the logged-in administrator's secure profile information.
     const fetchProfile = async () => {
+      // Admin token is required to view admin profile data
       const token = localStorage.getItem("adminToken");
       try {
         const res = await fetch("/api/admin/profile", {

@@ -28,6 +28,8 @@ export async function GET(req) {
         // When the admin logged in, we stored their 'admin_id' under the name 'id'.
 
         // Step 2: Security Check. Double check that they actually have the 'admin' role
+        // PRIVILEGE: Admin Profile Access
+        // Only Admins can fetch Admin profile data.
         if (adminAuth.role !== 'admin') {
             return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
         }

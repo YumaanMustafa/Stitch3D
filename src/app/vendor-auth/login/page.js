@@ -22,10 +22,12 @@ export default function VendorLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // This function handles the login process when the user clicks 'Sign In'
   const handleLogin = async (values, { setSubmitting }) => {
     setServerMessage("");
     setLoading(true); // Show spinner while fetching
     try {
+      // Send the email and password to the vendor authentication backend route
       const res = await fetch("/api/auth/vendor/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

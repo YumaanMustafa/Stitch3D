@@ -56,59 +56,85 @@ function OtpBoxes({ value, onChange }) {
 }
 
 function SupplierVerifyEmailContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const email = searchParams.get("email");
+  // STEP 1: Setting up State and URLs
+  const router = useRouter(); // Tool to change pages later
+  const searchParams = useSearchParams(); // Reads the web address (URL)
+  const email = searchParams.get("email"); // Grabs the '?email=something@example.com' part of the link
 
+  // Set up variables to hold our data
+  // If there's no email in the URL, we show an error right away
   const [serverMessage, setServerMessage] = useState(!email ? "No email provided. Please sign up first." : "");
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [resending, setResending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // Changes the screen to a green "Success" layout when true
+  const [otp, setOtp] = useState(""); // Holds the 6 numbers the user types in
+  const [resending, setResending] = useState(false); // Disables the 'Resend Code' button while it's working
 
+  // STEP 2: The Verification Function
+  // Runs when they click "Confirm Code"
   const handleVerify = async ({ setSubmitting }) => {
+    // 2A: Basic Check - Ensure they typed all 6 digits before asking the server
     if (otp.length < 6) {
       setServerMessage("Full code required.");
-      return;
+      return; // Stop here, don't talk to the backend
     }
+    
+    // Clear old messages and start the loading animation
     setServerMessage("");
     setIsSuccess(false);
     setSubmitting(true);
+    
     try {
+      // 2B: Send the Email and the 6-digit Code to the backend for checking
       const res = await fetch("/api/auth/verify", {
-        method: "POST",
+        method: "POST", // POST because we are sending sensitive verification data
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otp }),
       });
+      
       const data = await res.json();
+      
+      // 2C: Handle the Result
       if (res.ok) {
+        // Success! The code matched. Change the screen to the success view.
         setIsSuccess(true);
         setServerMessage(data.message || "Email verified! Review in progress.");
       } else {
+        // Failure! (e.g. wrong code or expired code)
         setServerMessage(data.message || "Code is incorrect.");
       }
     } catch (err) {
+      // Handle wifi/network dropouts
       setServerMessage("Error. Try again.");
     } finally {
+      // Stop the loading spinner
       setSubmitting(false);
     }
   };
 
+  // STEP 3: Resend Code Function
+  // Runs if they didn't get the email and click "Resend"
   const handleResend = async () => {
-    if (!email) return;
-    setResending(true);
+    if (!email) return; // Can't resend if we don't know who they are!
+    
+    setResending(true); // Show a loading indicator next to the resend button
     setServerMessage("Sending code...");
+    
     try {
+      // Ask the server to generate and email a fresh 6-digit code
       const res = await fetch("/api/auth/resend-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (res.ok) setServerMessage("New code sent!");
-      else setServerMessage("Failed to resend.");
+      
+      if (res.ok) {
+          setServerMessage("New code sent!");
+      } else {
+          setServerMessage("Failed to resend.");
+      }
     } catch (err) {
       setServerMessage("Failed to resend code");
     } finally {
-      setResending(false);
+      setResending(false); // Enable the button again
     }
   };
 

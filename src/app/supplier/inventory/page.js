@@ -47,103 +47,131 @@ export default function SupplierInventory() {
     // Helper function to show a simple notification alert popup
     const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => { } });
 
-    // Function to fetch all inventory materials belonging to this logged in supplier from backend API
-    async function fetchInventory() {
-        try {
-            // Read authentication token stored in browser local storage
-            const token = localStorage.getItem("supplierToken");
-            // Make HTTP GET request to inventory API endpoint with Authorization header
-            const res = await fetch("/api/supplier/inventory", {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            // If response is successful, parse JSON data and update inventory state
-            if (res.ok) {
-                const data = await res.json();
-                setInventory(data);
-            }
-        } catch (err) {
-            // Print error to browser console if fetch fails
-            console.error("Load error:", err);
-        } finally {
-            // Set loading state to false after fetch attempt completes
-            setLoading(false);
-        }
-    }
+  // STEP 1: Fetching Inventory Data
+  // This asynchronous function asks the database for a list of all raw materials this supplier owns
+  async function fetchInventory() {
+      try {
+          // 1A: Get the digital ID card (token) to prove who we are
+          const token = localStorage.getItem("supplierToken");
+          
+          // 1B: Send a network request to the backend server API
+          const res = await fetch("/api/supplier/inventory", {
+              // We must attach our token to the 'headers' so the server knows we have permission
+              headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // 1C: Process the server's reply
+          if (res.ok) {
+              // Convert the raw server data (text) into a Javascript array
+              const data = await res.json();
+              // Save that array into our React state, which updates the screen with the new items!
+              setInventory(data);
+          }
+      } catch (err) {
+          // If the internet cuts out or the server crashes, log it so developers can see the error
+          console.error("Load error:", err);
+      } finally {
+          // 1D: Clean up
+          // Whether it worked or failed, we are done loading. Turn off the loading spinner.
+          setLoading(false);
+      }
+  }
 
-    // Effect hook that runs once when component first loads on screen
-    useEffect(() => {
-        // Use a tiny timeout delay to safely trigger fetch inventory without React state warnings
-        setTimeout(() => {
-            fetchInventory();
-        }, 0);
-    }, []);
+  // STEP 2: Automatic Data Loading
+  // This `useEffect` hook runs exactly once when the Supplier Inventory page first opens
+  useEffect(() => {
+      // We use a tiny setTimeout delay (0 milliseconds) as a safe way to trigger the fetch
+      // without causing React state warning errors during the initial screen drawing phase.
+      setTimeout(() => {
+          fetchInventory();
+      }, 0);
+  }, []); // The empty array [] means "only do this ONCE when the page loads"
 
-    // Function to handle form submission when user clicks save to add or edit a material
-    const handleSave = async (values, { setSubmitting, resetForm }) => {
-        try {
-            // Get user token for API authentication
-            const token = localStorage.getItem("supplierToken");
-            // Use PUT request if editing existing item, or POST request if adding new item
-            const method = editingItem ? "PUT" : "POST";
-            // Build target URL based on whether we are editing or creating
-            const url = editingItem ? `/api/supplier/inventory/${editingItem.id}` : "/api/supplier/inventory";
-            
-            // Send request to server with material values formatted as JSON
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}` 
-                },
-                body: JSON.stringify(values)
-            });
+  // STEP 3: Saving a New or Edited Material
+  // This function is triggered when the user fills out the material form and clicks "Save Material"
+  const handleSave = async (values, { setSubmitting, resetForm }) => {
+      try {
+          // 3A: Authentication
+          const token = localStorage.getItem("supplierToken");
+          
+          // 3B: Determine Action (Create vs Update)
+          // If `editingItem` has data, it means we clicked 'Edit' on an existing material, so we use "PUT" (update)
+          // If `editingItem` is null, we are creating a brand new material, so we use "POST" (create)
+          const method = editingItem ? "PUT" : "POST";
+          
+          // Similarly, if updating, we need to tell the server exactly *which* item ID to update.
+          const url = editingItem ? `/api/supplier/inventory/${editingItem.id}` : "/api/supplier/inventory";
+          
+          // 3C: Send the Data
+          const res = await fetch(url, {
+              method, // PUT or POST
+              headers: { 
+                  "Content-Type": "application/json", // Tell the server we are sending JSON format
+                  Authorization: `Bearer ${token}` 
+              },
+              // Package the form input values into a JSON string to send over the network
+              body: JSON.stringify(values)
+          });
 
-            // If save succeeded, refresh inventory list, close modal, and show success message
-            if (res.ok) {
-                fetchInventory();
-                setModalOpen(false);
-                setEditingItem(null);
-                resetForm();
-                showAlert("Success", editingItem ? "Material updated." : "Material added.");
-            } else {
-                showAlert("Error", "Failed to save material.", "warning");
-            }
-        } catch (err) {
-            showAlert("Error", "Network error.", "warning");
-        } finally {
-            // Stop form submitting state
-            setSubmitting(false);
-        }
-    };
+          // 3D: Handle Success
+          if (res.ok) {
+              fetchInventory(); // Reload the list from the database to show the new changes
+              setModalOpen(false); // Close the popup form
+              setEditingItem(null); // Clear the edit state so we are ready for a new item next time
+              resetForm(); // Empty the form text boxes
+              // Show a green success popup alert
+              showAlert("Success", editingItem ? "Material updated." : "Material added.");
+          } else {
+              // Show a red warning popup if the server rejected our save attempt
+              showAlert("Error", "Failed to save material.", "warning");
+          }
+      } catch (err) {
+          showAlert("Error", "Network error.", "warning");
+      } finally {
+          // 3E: Clean up
+          // Turn off the spinning "Saving..." text on the button so the user can click it again
+          setSubmitting(false);
+      }
+  };
 
-    // Function to handle deleting a material item by ID
-    const handleDelete = (id) => {
-        // Show confirmation popup before deleting
-        setConf({
-            open: true,
-            title: "Delete Material",
-            message: "Permanently remove this material from inventory?",
-            type: "warning",
-            hideCancel: false,
-            // Action to execute when user clicks confirm button
-            onConfirm: async () => {
-                try {
-                    const token = localStorage.getItem("supplierToken");
-                    // Send HTTP DELETE request to API
-                    const res = await fetch(`/api/supplier/inventory/${id}`, {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                        // Filter out deleted item from local state array immediately
-                        setInventory(prev => prev.filter(i => i.id !== id));
-                        setConf({ ...conf, open: false });
-                        showAlert("Deleted", "Material removed from system.");
-                    }
-                } catch (err) {}
-            }
-        });
-    };
+  // STEP 4: Deleting a Material
+  // This function is triggered when the user clicks the red trash can icon next to a material
+  const handleDelete = (id) => {
+      // First, we show a popup asking "Are you sure?" so they don't accidentally delete something
+      setConf({
+          open: true,
+          title: "Delete Material",
+          message: "Permanently remove this material from inventory?",
+          type: "warning",
+          hideCancel: false, // Show the 'Cancel' button in case they change their mind
+          
+          // If they click 'Confirm', this inner function runs:
+          onConfirm: async () => {
+              try {
+                  const token = localStorage.getItem("supplierToken");
+                  // Send a network request using the "DELETE" method to completely erase it from the database
+                  const res = await fetch(`/api/supplier/inventory/${id}`, {
+                      method: "DELETE",
+                      headers: { Authorization: `Bearer ${token}` }
+                  });
+                  
+                  if (res.ok) {
+                      // 4A: Instant Screen Update
+                      // Instead of waiting to fetch the entire inventory again, we just quickly filter out 
+                      // the deleted item from our current React state list so it vanishes instantly!
+                      setInventory(prev => prev.filter(i => i.id !== id));
+                      
+                      // 4B: Close the confirmation popup
+                      setConf({ ...conf, open: false });
+                      // Show a green success message
+                      showAlert("Deleted", "Material removed from system.");
+                  }
+              } catch (err) {
+                  // Silently ignore network errors during delete to prevent console spam
+              }
+          }
+      });
+  };
 
     // Filter inventory items based on what user typed in search bar (matches name or type)
     const filtered = inventory.filter(p => 

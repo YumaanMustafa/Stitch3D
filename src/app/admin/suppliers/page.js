@@ -40,10 +40,13 @@ export default function SupplierManagement() {
     setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
   };
 
+  // PRIVILEGE 1: View All Suppliers
+  // Only Admins can fetch the master list of all suppliers, including their sensitive business registration details.
   const fetchSuppliers = async () => {
     setLoading(true);
     setError("");
     try {
+      // The admin's JWT token is required to authorize this request
       const token = localStorage.getItem("adminToken");
       const res = await fetch("/api/admin/suppliers", {
         headers: { Authorization: `Bearer ${token}` },
@@ -90,6 +93,9 @@ export default function SupplierManagement() {
     setModalOpen(true);
   };
 
+  // PRIVILEGE 2: Gatekeeper Approval
+  // Admins are the only ones who can change a supplier's status from 'pending' to 'active' or 'rejected'.
+  // This ensures no supplier can start selling without passing admin verification.
   const confirmStatusUpdate = async () => {
     if (!selectedSupplier || !pendingStatus) return;
 
@@ -119,6 +125,8 @@ export default function SupplierManagement() {
     setModalOpen(true);
   };
 
+  // PRIVILEGE 3: Absolute Deletion
+  // Admins can permanently delete a supplier's account and all their associated data from the platform.
   const confirmDelete = async () => {
     if (!selectedSupplier) return;
 

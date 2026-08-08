@@ -17,45 +17,67 @@ const SupplierSignupSchema = Yup.object().shape({
 });
 
 export default function SupplierSignup() {
-  const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [serverMessage, setServerMessage] = useState("");
+  // STEP 1: Setting up State Variables
+  const router = useRouter(); // Tool to navigate between pages (like redirecting after signup)
+  const [step, setStep] = useState(1); // Tracks which part of the form we are on (Step 1 or Step 2)
+  const [serverMessage, setServerMessage] = useState(""); // Stores error or success messages from the database
 
+  // STEP 2: The Signup Function
+  // This runs when the user clicks "Sign Up" on the final step of the form
   const handleSubmit = async (values, { setSubmitting }) => {
+    // Clear any old error messages
     setServerMessage("");
+    
     try {
+      // 2A: Send all the form data (company name, email, etc.) to the backend to create an account
       const res = await fetch("/api/auth/supplier/register", {
-        method: "POST",
+        method: "POST", // POST is used to securely send data
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(values), // Convert the form data into JSON text
       });
+      
       const data = await res.json();
+      
+      // 2B: Handle a Successful Signup
       if (res.ok) {
         setServerMessage("Account created! Please verify your email.");
+        // After 1.5 seconds, send them to the verification screen, passing their email in the URL
         setTimeout(() => router.push(`/supplier-auth/verify?email=${encodeURIComponent(values.email)}`), 1500);
       } else {
+        // 2C: Handle a Failed Signup (e.g., email already registered)
         setServerMessage(data.message || "Registration failed.");
       }
     } catch (err) {
+      // 2D: Handle network issues
       setServerMessage("Network error.");
     } finally {
+      // Re-enable the submit button so they can try again if there was an error
       setSubmitting(false);
     }
   };
 
   return (
+    // STEP 3: The User Interface (UI)
+    // The main container that takes up the full screen (min-h-screen) with a light gray background (bg-slate-50)
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-[#F97316] selection:text-white">
+      
+      {/* Decorative Background: Adds a subtle orange gradient at the bottom */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-[#F97316]/5 to-transparent" />
       </div>
 
+      {/* Main Content Box: This uses 'framer-motion' to smoothly slide up when the page loads */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-lg relative z-10"
       >
+        {/* The white card that holds the form, styled with rounded corners and a shadow */}
         <div className="bg-white border border-slate-200 rounded-[3rem] p-10 md:p-14 shadow-2xl shadow-slate-200/40">
+          
+          {/* Header Section: Icon, Title, and Subtitle */}
           <div className="text-center mb-10">
+            {/* Orange box with a Truck icon inside */}
             <div className="w-16 h-16 bg-[#F97316] rounded-2xl mx-auto flex items-center justify-center shadow-2xl mb-8">
               <Truck className="text-white" size={32} />
             </div>

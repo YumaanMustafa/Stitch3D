@@ -43,7 +43,9 @@ export default function VendorMaterialRequests() {
   const [conf, setConf] = useState({ open: false, title: "", message: "", type: "warning", onConfirm: () => {}, hideCancel: false });
   const showAlert = (title, message, type = "success") => setConf({ open: true, title, message, type, hideCancel: true, onConfirm: () => {} });
 
-  // API Call: fetches B2B requests initiated by the vendor
+  // PRIVILEGE 1: B2B Material Sourcing
+  // Vendors have the exclusive privilege to request raw materials directly from partnered suppliers.
+  // The backend uses their vendorToken to fetch only their own order history.
   async function fetchRequests() {
     try {
       const token = localStorage.getItem("vendorToken");

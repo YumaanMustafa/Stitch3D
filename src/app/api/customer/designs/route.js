@@ -91,6 +91,8 @@ export async function POST(request) {
         const material = newDesign.material || 'cowhide';
         const vendorId = newDesign.vendorId || null;
         
+        const size = newDesign.size || null;
+
         // Step 4: Convert complex objects into strings so the database can store them
         const views = typeof newDesign.views === 'string' ? newDesign.views : JSON.stringify(newDesign.views);
         const snapshots = typeof newDesign.snapshots === 'string' ? newDesign.snapshots : JSON.stringify(newDesign.snapshots || {});
@@ -107,14 +109,14 @@ export async function POST(request) {
 
             // Update the existing design record
             await db.query(
-                'UPDATE customized_designs SET name = ?, color = ?, material = ?, vendor_id = ?, views = ?, snapshots = ?, preview = ?, created_at = NOW() WHERE id = ?',
-                [name, color, material, vendorId, views, snapshots, preview, id]
+                'UPDATE customized_designs SET name = ?, color = ?, material = ?, size = ?, vendor_id = ?, views = ?, snapshots = ?, preview = ?, created_at = NOW() WHERE id = ?',
+                [name, color, material, size, vendorId, views, snapshots, preview, id]
             );
         } else {
             // Create a brand new design record
             await db.query(
-                'INSERT INTO customized_designs (id, user_id, name, color, material, vendor_id, views, snapshots, preview, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-                [id, userId, name, color, material, vendorId, views, snapshots, preview]
+                'INSERT INTO customized_designs (id, user_id, name, color, material, size, vendor_id, views, snapshots, preview, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+                [id, userId, name, color, material, size, vendorId, views, snapshots, preview]
             );
         }
 

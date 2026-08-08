@@ -73,28 +73,42 @@ export default function ProfilePage() {
     if (ms) setTimeout(() => setAlert({ type: "", message: "" }), ms);
   };
 
+  // This effect runs automatically when the Profile page loads
   useEffect(() => {
+    // STEP 1: Verify the User
+    // Get the user's security token (which proves they are logged in) from local storage
     const t = token();
     if (!t) {
+      // If they don't have a token, kick them back to the login screen immediately
       router.replace("/login");
       return;
     }
 
+    // STEP 2: Fetch Data from the Database
+    // We create an async function to ask the backend server for this user's profile details
     const fetchProfile = async () => {
       try {
+        // We use fetch to call the backend API endpoint (`/api/auth/profile`)
         const res = await fetch(`${API_BASE}/profile`, {
+          // We attach the token in the headers so the server knows exactly who is asking
           headers: { Authorization: `Bearer ${t}` }
         });
+        
+        // Convert the server's text response into a JavaScript object
         const data = await res.json();
 
+        // If the server says something went wrong (e.g., error 404 or 500)
         if (!res.ok) throw new Error("Failed to fetch profile");
 
+        // Save all the raw profile data into our React state variable (`profile`)
         setProfile(data);
 
-        setProfile(data);
-
-        // Handle both user data and customer data
-        const customer = data.customer || {};
+        // STEP 3: Auto-fill the Form Fields
+        // We need to split the data. The backend sends generic 'user' data (name, email)
+        // and specific 'customer' data (address, phone number) separated.
+        const customer = data.customer || {}; // If they have no customer data yet, use an empty object
+        
+        // We set the initial values of our text boxes to whatever the database just gave us
         setInitialFormValues({
           firstName: data.first_name || "",
           lastName: data.last_name || "",
@@ -106,15 +120,19 @@ export default function ProfilePage() {
           postal_code: customer.postal_code || ""
         });
       } catch (err) {
+        // If there was a network error or the server crashed, log it for developers
         console.error("Profile fetch error:", err);
+        // Show a red error popup to the user
         showAlert("error", "Failed to load profile information");
       } finally {
+        // STEP 4: Clean up
+        // Whether it succeeded or failed, turn off the loading spinner so they can see the screen
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [router]);
+    fetchProfile(); // Actually run the async function we just defined
+  }, [router]); // This empty array means it runs exactly once when the component mounts
 
   const handleInputChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -134,14 +152,18 @@ export default function ProfilePage() {
     setEditing(false);
   };
 
+  // This function runs when the user clicks "Save Changes" on their profile form
   const handleUpdateProfile = async (values, { setSubmitting }) => {
     try {
+      // STEP 1: Send the new edited values to the backend server
       const res = await fetch(`${API_BASE}/profile`, {
-        method: "PUT",
+        method: "PUT", // PUT is the HTTP method used when we want to UPDATE existing data
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token()}`
+          "Content-Type": "application/json", // Tell the server we are sending JSON data
+          Authorization: `Bearer ${token()}` // Show our digital ID card
         },
+        // We package all the form inputs into a JSON string to send over the internet
+        // Notice how we put the address details inside a nested 'customer' object, matching what the backend expects
         body: JSON.stringify({
           firstName: values.firstName,
           lastName: values.lastName,
@@ -155,12 +177,22 @@ export default function ProfilePage() {
         }),
       });
 
+      // Parse the server's response
       const data = await res.json();
+      
+      // STEP 2: Check for Server Errors
+      // If the server rejected the update (e.g., invalid phone number format)
       if (!res.ok) throw new Error(data.message || "Update failed");
+      
+      // STEP 3: Update the Screen with the New Data
+      // We manually update our React state so the new name/address shows up instantly
+      // without needing to refresh the webpage.
       setProfile(data.user ? { ...data.user, customer: data.customer } : data);
 
       const newCustomer = (data.user ? data.customer : data.customer) || {};
       const newUser = data.user || data;
+      
+      // Also update the hidden form values, so if they click 'Edit' again, it shows the new data
       setInitialFormValues({
         firstName: newUser.first_name || "",
         lastName: newUser.last_name || "",
@@ -172,13 +204,20 @@ export default function ProfilePage() {
         postal_code: newCustomer.postal_code || ""
       });
 
+      // STEP 4: Success Cleanup
+      // Turn off editing mode (changes the Save button back to a Pencil icon)
       setEditing(false);
       setEditingContact(false);
+      // Show a green success popup at the bottom of the screen
       showAlert("success", "Profile updated successfully");
+      
     } catch (err) {
+      // If anything crashed, log it and show a red error popup
       console.error("Update error:", err);
       showAlert("error", err.message);
     } finally {
+      // STEP 5: Final Cleanup
+      // Turn off the "Saving..." spinning state on the button so they can click it again
       setSubmitting(false);
     }
   };
